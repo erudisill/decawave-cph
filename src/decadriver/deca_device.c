@@ -637,8 +637,8 @@ uint16 dwt_readantennadelay(uint8 prf)
  *                         standard PHR mode allows up to 127 bytes
  *                         if > 127 is programmed, DWT_PHRMODE_EXT needs to be set in the phrMode configuration
  *                         see dwt_configure function
- * @param txFrameBytes   - Pointer to the user’s buffer containing the data to send.
- * @param txBufferOffset - This specifies an offset in the DW1000’s TX Buffer at which to start writing data.
+ * @param txFrameBytes   - Pointer to the userï¿½s buffer containing the data to send.
+ * @param txBufferOffset - This specifies an offset in the DW1000ï¿½s TX Buffer at which to start writing data.
  *
  * output parameters
  *
@@ -2212,6 +2212,7 @@ void dwt_isr(void) // assume interrupt can supply context
 	{
 		
 		//got LDE done but other flags SFD and PHR are clear - this is a bad frame - reset the transceiver
+		printf("*1\r\n");
 		dwt_forcetrxoff(); //this will clear all events
 		
 		dwt_rxreset();		
@@ -2251,6 +2252,7 @@ void dwt_isr(void) // assume interrupt can supply context
 				//when the overrun happens the frame info data of the buffer A (which contains the older frame e.g. seq. num = x) 
 				//will be corrupted with the latest frame (seq. num = x + 2) data, both the host and IC are pointing to buffer A
 				//we are going to discard this frame - turn off transceiver and reset receiver
+				printf("*2\r\n");
 				dwt_forcetrxoff();
 				
 				dwt_rxreset();	
@@ -2350,6 +2352,7 @@ void dwt_isr(void) // assume interrupt can supply context
 				{
 						//the calback has completed, but the overrun has been set, before we toggled, this means two new frames have arrived (one in the other buffer) and the 2nd's PHR good set the overrun flag  
 						//due to a receiver bug, which cannot guarantee the last frame's data was not corrupted need to reset receiver and discard any new data
+					printf("*3\r\n");
 					dwt_forcetrxoff();
 
 					dwt_rxreset();	
@@ -2388,6 +2391,7 @@ void dwt_isr(void) // assume interrupt can supply context
             		//if using wait4response and the ACK has been sent as the response requested it
             		//the receiver will be re-enabled, so issue a TRXOFF command to disable and prevent any
             		//unexpected interrupts
+            		printf("*4\r\n");
             		dwt_forcetrxoff();
             	}
             }
@@ -2420,8 +2424,10 @@ void dwt_isr(void) // assume interrupt can supply context
         //new events can trigger and give rise to new interrupts
 
 		//fix for bug 622 - LDE done flag gets latched on a bad frame / reset receiver 
-		if(!(dw1000local.sysCFGreg & SYS_CFG_RXAUTR)) 
+		if(!(dw1000local.sysCFGreg & SYS_CFG_RXAUTR)) {
+			printf("*5\r\n");
 			dwt_forcetrxoff(); //this will clear all events
+		}
 
 		dwt_rxreset();	//reset the RX
 
@@ -2833,6 +2839,7 @@ int dwt_rxenable(int delayed)
 
         if (temp1 & (SYS_STATUS_HPDWARN >> 24)) //if delay has not passed do delayed else immediate RX on
         {
+    		printf("*6\r\n");
             dwt_forcetrxoff(); //turn the delayed receive off, and do immediate receive, return warning indication
             temp = (uint16)SYS_CTRL_RXENAB; //clear the delay bit
             dwt_write16bitoffsetreg(SYS_CTRL_ID,0,temp) ;

@@ -105,17 +105,18 @@ void cph_deca_isr_enable(void) {
 	extint_chan_enable_callback(DW_IRQ_LINE, EXTINT_CALLBACK_TYPE_DETECT);
 }
 bool cph_deca_isr_is_detected(void) {
-	return extint_chan_is_detected(DW_IRQ_LINE);
+	return port_pin_get_input_level(DW_IRQ_PIN);
+	//return extint_chan_is_detected(DW_IRQ_LINE);
 }
 
 decaIrqStatus_t cph_deca_isr_mutex_on(void) {
-	printf("cph_deca_isr_mutex_on\r\n");
+	TRACE("cph_deca_isr_mutex_on\r\n");
 	cph_deca_isr_disable();
 	return 0x00;
 }
 
 void cph_deca_isr_mutex_off(decaIrqStatus_t s) {
-	printf("cph_deca_isr_mutex_off\r\n");
+	TRACE("cph_deca_isr_mutex_off\r\n");
 	cph_deca_isr_enable();
 }
 
