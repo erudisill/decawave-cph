@@ -2429,6 +2429,7 @@ void dwt_isr(void) // assume interrupt can supply context
 			dwt_forcetrxoff(); //this will clear all events
 		}
 
+		printf("*6\r\n");
 		dwt_rxreset();	//reset the RX
 
 		//end of fix for bug 622 - LDE done flag gets latched on a bad frame

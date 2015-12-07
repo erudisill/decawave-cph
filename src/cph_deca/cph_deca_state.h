@@ -18,7 +18,6 @@
 #include <deca_device_api.h>
 
 #define CPH_DECA_DATA_LEN_MAX	128
-#define CPH_DECA_EVENTS_MAX		10
 
 enum {
 	CPH_DECA_STATE_NONE = 0,
@@ -59,21 +58,19 @@ typedef struct {
 
 
 
-void cph_deca_state_init(void);
+void cph_deca_state_init(cph_deca_state_t states[], cph_queue_info_t * q);
 void cph_deca_state_transition(int new_state);
 void cph_deca_state_tick(void);
 
-static void cph_deca_txcallback(const dwt_callback_data_t *txd);
-static void cph_deca_rxcallback(const dwt_callback_data_t *txd);
+void cph_deca_txcallback(const dwt_callback_data_t *txd);
+void cph_deca_rxcallback(const dwt_callback_data_t *txd);
 
-static void cph_deca_state_init_run(cph_deca_state_t * curr_state);
-static void cph_deca_state_rx_enter(cph_deca_state_t * prev_state);
-static void cph_deca_state_rx_run(cph_deca_state_t * curr_state);
 
 extern volatile int _timeoutcount;
 extern volatile bool _timeout;
 extern volatile int _ovr_count;
-
-
+extern volatile bool _ovr;
+extern volatile bool _err;
+extern volatile int _err_count;
 
 #endif /* SRC_CPH_DECA_CPH_DECA_STATE_H_ */

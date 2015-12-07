@@ -28,8 +28,8 @@
  * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
  */
 #include <cph.h>
-
-
+#include <anchor.h>
+#include <tag.h>
 
 int main(void) {
 	system_init();
@@ -53,7 +53,8 @@ int main(void) {
 	}
 
 	// init cph_deca
-	cph_deca_init();
+	anchor_init();
+//	tag_init();
 
 	system_interrupt_enable_global();
 

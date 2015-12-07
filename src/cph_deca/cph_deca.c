@@ -22,8 +22,8 @@ void cph_deca_print_status(uint32_t count) {
 
 	status = dwt_read32bitreg(SYS_STATUS_ID);
 	status1 = dwt_read32bitoffsetreg(SYS_STATUS_ID, 1);            // read status register
-	TRACE("\r\nID:%08X  SYS_STATUS %02X %08X  count:%lu    timeouts:%d\r\n\r\n", id, status1 >> 24, status, count,
-			_timeoutcount);
+	TRACE("\r\nID:%08X  SYS_STATUS %02X %08X  count:%lu    timeouts:%d  ovr:%d  err:%d\r\n\r\n", id, status1 >> 24, status, count,
+			_timeoutcount, _ovr_count, _err_count);
 }
 
 void cph_deca_init_dw(void (*txcallback)(const dwt_callback_data_t *), void (*rxcallback)(const dwt_callback_data_t *)) {
@@ -38,7 +38,7 @@ void cph_deca_init_dw(void (*txcallback)(const dwt_callback_data_t *), void (*rx
 	TRACE("done  %8X\r\n", result);
 
 //	TRACE("dwt_enableframefilter ...");
-//	dwt_enableframefilter(DWT_FF_DATA_EN | DWT_FF_ACK_EN);
+//	dwt_enableframefilter(DWT_FF_DATA_EN /*| DWT_FF_ACK_EN*/);
 //	TRACE("done\r\n");
 
 	TRACE("dwt_setautorxreenable ...");
@@ -110,9 +110,9 @@ void cph_deca_config_dw(void) {
 }
 
 
-void cph_deca_init(void) {
+void cph_deca_init(cph_deca_state_t states[], cph_queue_info_t * q) {
 	// init the state machine
-	cph_deca_state_init();
+	cph_deca_state_init(states, q);
 
 	// now transition to the init state
 	cph_deca_state_transition(CPH_DECA_STATE_INIT);
