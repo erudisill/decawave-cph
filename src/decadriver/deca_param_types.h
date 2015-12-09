@@ -8,7 +8,6 @@
  *
  * All rights reserved.
  *
- * @author DecaWave
  */
 #ifndef _DECA_PARAM_TYPES_H_
 #define _DECA_PARAM_TYPES_H_
@@ -43,7 +42,6 @@ extern const uint16 dtune1[NUM_PRF];
 #define XMLPARAMS_VERSION	(1.17f)
 
 extern const uint8 pll2_config[NUM_CH][5];
-extern const uint8 pll2calcfg;
 extern const uint8 rx_config[NUM_BW];
 extern const uint32 tx_config[NUM_CH];
 extern const uint8 dwnsSFDlen[NUM_BR];				//length of SFD for each of the bitrates

@@ -28,9 +28,10 @@
  * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
  */
 #include <cph.h>
+#include <anchor.h>
+#include <tag.h>
 
 int ss_twr_init(void);
-int ss_twr_resp(void);
 
 int main(void) {
 	system_init();
@@ -53,8 +54,28 @@ int main(void) {
 		cph_millis_delay(125);
 	}
 
+	// init cph_deca
+//#ifdef ANCHOR
+//	anchor_init();
+//#else
+//	tag_init();
+//#endif
+	ss_twr_init();	// blocks
+
 	system_interrupt_enable_global();
 
-	ss_twr_init();	// blocks
-	//ss_twr_resp();
+	uint32_t count = 0;
+	uint32_t timestamp = cph_get_millis();
+	uint32_t elapsed = 0;
+	while (1) {
+		cph_deca_run();
+		elapsed = (cph_get_millis() - timestamp);
+		if (elapsed > 5000) {
+			timestamp = cph_get_millis();
+			cph_deca_print_status(count++);
+		}
+	}
+
+
+
 }

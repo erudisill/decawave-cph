@@ -8,8 +8,9 @@
  *
  * All rights reserved.
  *
- * @author DecaWave
- */
+ *
+ * -------------------------------------------------------------------------------------------------------------------
+**/
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -45,12 +46,10 @@ const uint8 pll2_config[NUM_CH][5] =
 
     { 0x08, 0x05, 0x40, 0x08, 0x26}, //4Ghz WBW
 
-    { 0x1D, 0x04, 0x00, 0x08, 0xA6}, //6.5Ghz
+    { 0x1D, 0x04, 0x00, 0x08, 0xBE}, //6.5Ghz
 
-    { 0x1D, 0x04, 0x00, 0x08, 0xA6} //6.5Ghz WBW
+    { 0x1D, 0x04, 0x00, 0x08, 0xBE} //6.5Ghz WBW
 };
-
-const uint8 pll2calcfg = (0x60 | 0x10) ;    /* Bits 7:5 must always be set to binary “011”. Failure to maintain this value will result in DW1000 malfunction. */
 
 
 //bandwidth configuration

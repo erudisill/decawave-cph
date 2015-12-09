@@ -8,7 +8,6 @@
  *
  * All rights reserved.
  *
- * @author DecaWave
  */
 #include <stdio.h>
 #include <stdlib.h>
@@ -21,19 +20,19 @@
 #define NUM_64M_OFFSET  (26)
 #define NUM_64M_OFFSETWB  (59)
 
-const uint8 chan_idxnb[NUM_CH_SUPPORTED] = {0, 0, 1, 2, 0, 3, 0, 0}; //only channels 1,2,3 and 5 are in the narrow band tables
-const uint8 chan_idxwb[NUM_CH_SUPPORTED] = {0, 0, 0, 0, 0, 0, 0, 1}; //only channels 4 and 7 are in in the wide band tables
+const uint8 chan_idxnb[NUM_CH_SUPPORTED] = {0, 0, 1, 2, 0, 3, 0, 0}; // Only channels 1,2,3 and 5 are in the narrow band tables
+const uint8 chan_idxwb[NUM_CH_SUPPORTED] = {0, 0, 0, 0, 0, 0, 0, 1}; // Only channels 4 and 7 are in in the wide band tables
 
 //---------------------------------------------------------------------------------------------------------------------------
 // Range Bias Correction TABLES of range values in integer units of 25 CM, for 8-bit unsigned storage, MUST END IN 255 !!!!!!
 //---------------------------------------------------------------------------------------------------------------------------
 
-// offsets to nearest centimeter for index 0, all rest are +1 cm per value
+// offsets to nearest centimetre for index 0, all rest are +1 cm per value
 
-#define CM_OFFSET_16M_NB    (-23)   // for normal band channels at 16 MHz PRF
-#define CM_OFFSET_16M_WB    (-28)   // for wider  band channels at 16 MHz PRF
-#define CM_OFFSET_64M_NB    (-17)   // for normal band channels at 64 MHz PRF
-#define CM_OFFSET_64M_WB    (-30)   // for wider  band channels at 64 MHz PRF
+#define CM_OFFSET_16M_NB    (-23)   // For normal band channels at 16 MHz PRF
+#define CM_OFFSET_16M_WB    (-28)   // For wider  band channels at 16 MHz PRF
+#define CM_OFFSET_64M_NB    (-17)   // For normal band channels at 64 MHz PRF
+#define CM_OFFSET_64M_WB    (-30)   // For wider  band channels at 64 MHz PRF
 
 
 //---------------------------------------------------------------------------------------------------------------------------
@@ -42,7 +41,7 @@ const uint8 chan_idxwb[NUM_CH_SUPPORTED] = {0, 0, 0, 0, 0, 0, 0, 1}; //only chan
 
 const uint8 range25cm16PRFnb[4][NUM_16M_OFFSET] =
 {
-    // ch 1 - range25cm16PRFnb
+    // Ch 1 - range25cm16PRFnb
     {
            1,
            3,
@@ -83,7 +82,7 @@ const uint8 range25cm16PRFnb[4][NUM_16M_OFFSET] =
          255
     },
 
-    // ch 2 - range25cm16PRFnb
+    // Ch 2 - range25cm16PRFnb
     {
            1,
            2,
@@ -124,7 +123,7 @@ const uint8 range25cm16PRFnb[4][NUM_16M_OFFSET] =
          255
     },
 
-    // ch 3 - range25cm16PRFnb
+    // Ch 3 - range25cm16PRFnb
     {
            1,
            2,
@@ -165,7 +164,7 @@ const uint8 range25cm16PRFnb[4][NUM_16M_OFFSET] =
          255
     },
 
-    // ch 5 - range25cm16PRFnb
+    // Ch 5 - range25cm16PRFnb
     {
            1,
            1,
@@ -214,7 +213,7 @@ const uint8 range25cm16PRFnb[4][NUM_16M_OFFSET] =
 
 const uint8 range25cm16PRFwb[2][NUM_16M_OFFSETWB] =
 {
-    // ch 4 - range25cm16PRFwb
+    // Ch 4 - range25cm16PRFwb
     {
            7,
            7,
@@ -286,7 +285,7 @@ const uint8 range25cm16PRFwb[2][NUM_16M_OFFSETWB] =
          255
     },
 
-    // ch 7 - range25cm16PRFwb
+    // Ch 7 - range25cm16PRFwb
     {
            4,
            5,
@@ -365,7 +364,7 @@ const uint8 range25cm16PRFwb[2][NUM_16M_OFFSETWB] =
 
 const uint8 range25cm64PRFnb[4][NUM_64M_OFFSET] =
 {
-    // ch 1 - range25cm64PRFnb
+    // Ch 1 - range25cm64PRFnb
     {
            1,
            2,
@@ -395,7 +394,7 @@ const uint8 range25cm64PRFnb[4][NUM_64M_OFFSET] =
          255
     },
 
-    // ch 2 - range25cm64PRFnb
+    // Ch 2 - range25cm64PRFnb
     {
            1,
            2,
@@ -425,7 +424,7 @@ const uint8 range25cm64PRFnb[4][NUM_64M_OFFSET] =
          255
     },
 
-    // ch 3 - range25cm64PRFnb
+    // Ch 3 - range25cm64PRFnb
     {
            1,
            1,
@@ -455,7 +454,7 @@ const uint8 range25cm64PRFnb[4][NUM_64M_OFFSET] =
          255
     },
 
-    // ch 5 - range25cm64PRFnb
+    // Ch 5 - range25cm64PRFnb
     {
            1,
            1,
@@ -492,7 +491,7 @@ const uint8 range25cm64PRFnb[4][NUM_64M_OFFSET] =
 
 const uint8 range25cm64PRFwb[2][NUM_64M_OFFSETWB] =
 {
-    // ch 4 - range25cm64PRFwb
+    // Ch 4 - range25cm64PRFwb
     {
            7,
            8,
@@ -555,7 +554,7 @@ const uint8 range25cm64PRFwb[2][NUM_64M_OFFSETWB] =
          255
     },
 
-    // ch 7 - range25cm64PRFwb
+    // Ch 7 - range25cm64PRFwb
     {
            4,
            5,
@@ -621,9 +620,9 @@ const uint8 range25cm64PRFwb[2][NUM_64M_OFFSETWB] =
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
- * Function: dwt_getrangebias()
+ * @fn dwt_getrangebias()
  *
- * Description: This function is used to return the range bias correction need for TWR with DW1000 units.
+ * @brief This function is used to return the range bias correction need for TWR with DW1000 units.
  *
  * input parameters:	
  * @param chan  - specifies the operating channel (e.g. 1, 2, 3, 4, 5, 6 or 7) 
@@ -636,18 +635,18 @@ const uint8 range25cm64PRFwb[2][NUM_64M_OFFSETWB] =
  */
 double dwt_getrangebias(uint8 chan, float range, uint8 prf)
 {
-    //first get the lookup index that corresponds to given range for a particular channel at 16M PRF
+    // First get the lookup index that corresponds to given range for a particular channel at 16M PRF
     int i = 0 ;
     int chanIdx ;
-    int cmoffseti ;                                 // integer number of CM offset
+    int cmoffseti ; // Integer number of CM offset
 
-    double mOffset ;                                // final offset result in metres
+    double mOffset ; // Final offset result in metres
 
     // NB: note we may get some small negitive values e.g. up to -50 cm.
 
-    int rangeint25cm = (int) (range * 4.00) ;       // convert range to integer number of 25cm values.
+    int rangeint25cm = (int) (range * 4.00) ; // Convert range to integer number of 25cm values.
 
-    if (rangeint25cm > 255) rangeint25cm = 255 ;    // make sure it matches largest value in table (all tables end in 255 !!!!)
+    if (rangeint25cm > 255) rangeint25cm = 255 ; // Make sure it matches largest value in table (all tables end in 255 !!!!)
 
     if (prf == DWT_PRF_16M)
     {
@@ -657,15 +656,15 @@ double dwt_getrangebias(uint8 chan, float range, uint8 prf)
             case 7:
             {
                 chanIdx = chan_idxwb[chan];
-                while (rangeint25cm > range25cm16PRFwb[chanIdx][i]) i++ ;       // find index in table corresponding to range
-                cmoffseti = i + CM_OFFSET_16M_WB ;                              // nearest centimeter correction
+                while (rangeint25cm > range25cm16PRFwb[chanIdx][i]) i++ ; // Find index in table corresponding to range
+                cmoffseti = i + CM_OFFSET_16M_WB ;                        // Nearest centimetre correction
             }
             break;
             default:
             {
                 chanIdx = chan_idxnb[chan];
-                while (rangeint25cm > range25cm16PRFnb[chanIdx][i]) i++ ;       // find index in table corresponding to range
-                cmoffseti = i + CM_OFFSET_16M_NB ;                              // nearest centimeter correction
+                while (rangeint25cm > range25cm16PRFnb[chanIdx][i]) i++ ; // Find index in table corresponding to range
+                cmoffseti = i + CM_OFFSET_16M_NB ;                        // Nearest centimetre correction
             }
         }//end of switch
     }
@@ -677,23 +676,23 @@ double dwt_getrangebias(uint8 chan, float range, uint8 prf)
             case 7:
             {
                 chanIdx = chan_idxwb[chan];
-                while (rangeint25cm > range25cm64PRFwb[chanIdx][i]) i++ ;       // find index in table corresponding to range
-                cmoffseti = i + CM_OFFSET_64M_WB ;                              // nearest centimeter correction
+                while (rangeint25cm > range25cm64PRFwb[chanIdx][i]) i++ ; // Find index in table corresponding to range
+                cmoffseti = i + CM_OFFSET_64M_WB ;                        // Nearest centimetre correction
             }
             break;
             default:
             {
                 chanIdx = chan_idxnb[chan];
-                while (rangeint25cm > range25cm64PRFnb[chanIdx][i]) i++ ;       // find index in table corresponding to range
-                cmoffseti = i + CM_OFFSET_64M_NB ;                              // nearest centimeter correction
+                while (rangeint25cm > range25cm64PRFnb[chanIdx][i]) i++ ; // Find index in table corresponding to range
+                cmoffseti = i + CM_OFFSET_64M_NB ;                        // Nearest centimetre correction
             }
         }//end of switch
     } // end else
 
 
-    mOffset = (float) cmoffseti ;                                       // offset result in centimmetres
+    mOffset = (float) cmoffseti ; // Offset result in centimetres
 
-    mOffset *= 0.01 ;                                                   // convert to metres
+    mOffset *= 0.01 ; // Convert to metres
 
     return (mOffset) ;
 }

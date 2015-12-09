@@ -44,6 +44,10 @@ void cph_deca_spi_ss_select(void) {
 	spi_select_slave(&spi_master_instance, &spi_slave, true);
 }
 
+void cph_deca_spi_set_baud(uint32_t baud) {
+	spi_set_baudrate(&spi_master_instance, baud);
+}
+
 
 int cph_deca_spi_write(uint16_t headerLength, const uint8_t *headerBuffer, uint32_t bodylength, const uint8_t *bodyBuffer) {
 	status_code_t result = STATUS_OK;
