@@ -153,11 +153,6 @@ int ss_twr_resp(void)
             if (frame_len <= RX_BUFFER_LEN)
             {
                 dwt_readrxdata(rx_buffer, frame_len, 0);
-//                printf("RCV ");
-//                for (int i=0;i<frame_len;i++) {
-//                	printf("%02X ", rx_buffer[i]);
-//                }
-//                printf("\r\n");
             }
 
             /* Check that the frame is a poll sent by "SS TWR initiator" example.

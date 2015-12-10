@@ -28,9 +28,7 @@
  * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
  */
 #include <cph.h>
-
-int ss_twr_init(void);
-int ss_twr_resp(void);
+#include <cph_deca_port.h>
 
 int main(void) {
 	system_init();
@@ -38,9 +36,7 @@ int main(void) {
 	cph_millis_init();
 	cph_stdio_init();
 
-	TRACE("DECAWAVE CPH       \r\n");
-	TRACE(SOFTWARE_VER_STRING);
-	TRACE("\r\n");
+	TRACE("%s\r\n", APP_NAME);
 
 	uint32_t f = system_gclk_gen_get_hz(0);
 	TRACE("CPU FREQ: %lu\r\n", f);
@@ -53,8 +49,11 @@ int main(void) {
 		cph_millis_delay(125);
 	}
 
+    // Start with board specific hardware init.
+	cph_deca_init_gpio();
+	cph_deca_spi_init();
+
 	system_interrupt_enable_global();
 
-	ss_twr_init();	// blocks
-	//ss_twr_resp();
+	app_run();
 }

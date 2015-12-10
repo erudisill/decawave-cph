@@ -84,10 +84,12 @@ static uint32 status_reg = 0;
 
 /* Delay between frames, in UWB microseconds. See NOTE 1 below. */
 //#define POLL_TX_TO_RESP_RX_DLY_UUS 140
-#define POLL_TX_TO_RESP_RX_DLY_UUS 280
+//#define POLL_TX_TO_RESP_RX_DLY_UUS 280
+#define POLL_TX_TO_RESP_RX_DLY_UUS 330
 /* Receive response timeout. See NOTE 5 below. */
 //#define RESP_RX_TIMEOUT_UUS 210
-#define RESP_RX_TIMEOUT_UUS 420
+//#define RESP_RX_TIMEOUT_UUS 420
+#define RESP_RX_TIMEOUT_UUS 370
 
 /* Speed of light in air, in metres per second. */
 #define SPEED_OF_LIGHT 299702547
@@ -101,10 +103,6 @@ char dist_str[16] = {0};
 
 /* Declaration of static functions. */
 static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
-
-
-/* Internal functions */
-static void print_status(uint32_t count);
 
 
 /*! ------------------------------------------------------------------------------------------------------------------
@@ -149,8 +147,6 @@ int ss_twr_init(void)
     /* Loop forever initiating ranging exchanges. */
     while (1)
     {
-//    	print_status(frame_seq_nb);
-
         /* Write frame data to DW1000 and prepare transmission. See NOTE 7 below. */
         tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
         dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
@@ -180,16 +176,6 @@ int ss_twr_init(void)
             if (frame_len <= RX_BUF_LEN)
             {
                 dwt_readrxdata(rx_buffer, frame_len, 0);
-//                printf("RCV ");
-//                for (int i=0;i<frame_len;i++) {
-//                	printf("%02X ", rx_buffer[i]);
-//                }
-//                printf("\r\n");
-//                printf("COM ");
-//                for (int i=0;i<ALL_MSG_COMMON_LEN;i++) {
-//                	printf("%02X ", rx_resp_msg[i]);
-//                }
-//                printf("\r\n");
             }
 
             /* Check that the frame is the expected response from the companion "SS TWR responder" example.
@@ -255,17 +241,6 @@ static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
     }
 }
 
-static void print_status(uint32_t count) {
-	uint32_t id = 0;
-	uint32 status = 0;
-	uint32 status1 = 0;
-
-	id = dwt_readdevid();
-
-	status = dwt_read32bitreg(SYS_STATUS_ID);
-	status1 = dwt_read32bitoffsetreg(SYS_STATUS_ID, 1);            // read status register
-	TRACE("ID:%08X  SYS_STATUS %02X %08X  count:%lu\r\n", id, status1 >> 24, status, count);
-}
 
 /*****************************************************************************************************************************************************
  * NOTES:
