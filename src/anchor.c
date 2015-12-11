@@ -20,9 +20,29 @@ static dwt_config_t config = DW_CONFIG;
 
 
 /* Frames used in the ranging process. See NOTE 3 below. */
-static uint8 rx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-static uint8 tx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+static msg_poll rx_poll_msg =
+{
+		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_ANCHOR_ID,	// mac_dest
+		MAC_TAG_ID,		// mac_source
+		0xE0,			// functionCode
+		0x0000			// mac_cs
+};
 
+static msg_resp tx_resp_msg =
+{
+		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_TAG_ID,		// mac_dest
+		MAC_ANCHOR_ID,	// mac_source
+		0xE1,			// functionCode
+		0x00000000,		// pollRxTs
+		0x00000000,		// respTxTs
+		0x0000			// mac_cs
+};
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
 
@@ -42,9 +62,6 @@ static uint64 resp_tx_ts;
 
 /* Declaration of static functions. */
 static uint64 get_rx_timestamp_u64(void);
-static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts);
-
-
 
 void anchor_run(void)
 {
@@ -54,6 +71,10 @@ void anchor_run(void)
     spi_set_rate_high();
 
     dwt_configure(&config);
+
+    dwt_setpanid(MAC_PAN_ID);
+    dwt_setaddress16(MAC_SHORT);
+    dwt_enableframefilter(DWT_FF_DATA_EN);
 
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
@@ -73,6 +94,7 @@ void anchor_run(void)
         if (status_reg & SYS_STATUS_RXFCG)
         {
             uint32 frame_len;
+            msg_poll * rx_buffer_poll_msg;
 
             /* Clear good RX frame event in the DW1000 status register. */
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
@@ -86,8 +108,9 @@ void anchor_run(void)
 
             /* Check that the frame is a poll sent by "SS TWR initiator" example.
              * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-            rx_buffer[ALL_MSG_SN_IDX] = 0;
-            if (memcmp(rx_buffer, rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
+            //rx_buffer[ALL_MSG_SN_IDX] = 0;
+            ((msg_poll*)rx_buffer)->mac_sequence = 0;
+            if (memcmp(rx_buffer, (uint8_t*)&rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
             {
                 uint32 resp_tx_time;
 
@@ -102,12 +125,12 @@ void anchor_run(void)
                 resp_tx_ts = (((uint64)(resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
 
                 /* Write all timestamps in the final message. See NOTE 8 below. */
-                resp_msg_set_ts(&tx_resp_msg[RESP_MSG_POLL_RX_TS_IDX], poll_rx_ts);
-                resp_msg_set_ts(&tx_resp_msg[RESP_MSG_RESP_TX_TS_IDX], resp_tx_ts);
+                tx_resp_msg.pollRxTs = poll_rx_ts;
+                tx_resp_msg.respTxTs = resp_tx_ts;
 
                 /* Write and send the response message. See NOTE 9 below. */
-                tx_resp_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
-                dwt_writetxdata(sizeof(tx_resp_msg), tx_resp_msg, 0);
+                tx_resp_msg.mac_sequence = 0;
+                dwt_writetxdata(sizeof(tx_resp_msg), (uint8_t*)&tx_resp_msg, 0);
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0);
                 int result = dwt_starttx(DWT_START_TX_DELAYED);
             	uint32_t ts = dwt_readsystimestamphi32();
@@ -162,25 +185,7 @@ static uint64 get_rx_timestamp_u64(void)
     return ts;
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn final_msg_set_ts()
- *
- * @brief Fill a given timestamp field in the response message with the given value. In the timestamp fields of the
- *        response message, the least significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to fill
- *         ts  timestamp value
- *
- * @return none
- */
-static void resp_msg_set_ts(uint8 *ts_field, const uint64 ts)
-{
-    int i;
-    for (i = 0; i < RESP_MSG_TS_LEN; i++)
-    {
-        ts_field[i] = (ts >> (i * 8)) & 0xFF;
-    }
-}
+
 
 
 

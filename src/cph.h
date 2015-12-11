@@ -17,28 +17,33 @@
 #include <cph_stdio.h>
 #include <cph_queue.h>
 
-//#define	ANCHOR
-#define TAG
+#define	ANCHOR
+//#define TAG
 
 #define TRACE(...)				printf(__VA_ARGS__)
+
+
+// 								 'C''P'
+#define MAC_PAN_ID				0x4350
+#define MAC_ANCHOR_ID			0x4157
+#define MAC_TAG_ID				0x4556
 
 
 #ifdef ANCHOR
 #define APP_NAME  				"CPH ANCHOR Version 0.01"
 #define MAC_ADDRESS				0x4350010000000077
+#define MAC_SHORT				MAC_ANCHOR_ID
 #define app_run					anchor_run
 void anchor_run(void);
 
 #else
 #define APP_NAME  				"CPH TAG Version 0.01"
 #define MAC_ADDRESS				0x4350010000000078
+#define MAC_SHORT				MAC_TAG_ID
 #define app_run					tag_run
 void tag_run(void);
 
 #endif
-
-// 								 'C''P'
-#define PAN_ID					0x4350
 
 
 #define DW_CONFIG		\
@@ -95,5 +100,27 @@ enum {
 	CPH_BAD_FRAME,
 	CPH_BAD_LENGTH
 };
+
+typedef struct __attribute__((packed)) {
+	uint16_t mac_frameControl;
+	uint8_t mac_sequence;
+	uint16_t mac_panid;
+	uint16_t mac_dest;
+	uint16_t mac_source;
+	uint8_t functionCode;
+	uint16_t mac_cs;
+} msg_poll;
+
+typedef struct __attribute__((packed)) {
+	uint16_t mac_frameControl;
+	uint8_t mac_sequence;
+	uint16_t mac_panid;
+	uint16_t mac_dest;
+	uint16_t mac_source;
+	uint8_t functionCode;
+	uint32_t pollRxTs;
+	uint32_t respTxTs;
+	uint16_t mac_cs;
+} msg_resp;
 
 #endif /* SRC_CPH_H_ */

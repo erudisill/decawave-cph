@@ -19,9 +19,30 @@
 static dwt_config_t config = DW_CONFIG;
 
 
-/* Frames used in the ranging process. See NOTE 3 below. */
-static uint8 tx_poll_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'W', 'A', 'V', 'E', 0xE0, 0, 0};
-static uint8 rx_resp_msg[] = {0x41, 0x88, 0, 0xCA, 0xDE, 'V', 'E', 'W', 'A', 0xE1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+/* Frames used in the ranging process.  */
+static msg_poll tx_poll_msg =
+{
+		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_ANCHOR_ID,	// mac_dest  	'A' 'W'
+		MAC_TAG_ID,		// mac_source	'E' 'V'
+		0xE0,			// functionCode
+		0x0000			// mac_cs
+};
+
+static msg_resp rx_resp_msg =
+{
+		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_TAG_ID,		// mac_dest		'E' 'V'
+		MAC_ANCHOR_ID,	// mac_source  	'A' 'W'
+		0xE1,			// functionCode
+		0x00000000,		// pollRxTs
+		0x00000000,		// respTxTs
+		0x0000			// mac_cs
+};
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -38,17 +59,15 @@ static uint32 status_reg = 0;
 static double tof;
 static double distance;
 
-/* Declaration of static functions. */
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts);
 
 
 static int poll(double * dist) {
 	int result = CPH_OK;
 
 	// Setup POLL frame to request to range with anchor
-    tx_poll_msg[ALL_MSG_SN_IDX] = frame_seq_nb;
+	tx_poll_msg.mac_sequence = frame_seq_nb;
     dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-    dwt_writetxdata(sizeof(tx_poll_msg), tx_poll_msg, 0);
+    dwt_writetxdata(sizeof(tx_poll_msg), (uint8_t*)(&tx_poll_msg), 0);
     dwt_writetxfctrl(sizeof(tx_poll_msg), 0);
 
     // Start transmission, indicating that a response is expected so that reception is enabled automatically
@@ -77,7 +96,7 @@ static int poll(double * dist) {
 
 			// If valid response, calculate distance
 			rx_buffer[ALL_MSG_SN_IDX] = 0;
-			if (memcmp(rx_buffer, rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
+			if (memcmp(rx_buffer, (uint8_t*)&rx_resp_msg, ALL_MSG_COMMON_LEN) == 0)
 			{
 				uint32 poll_tx_ts, resp_rx_ts, poll_rx_ts, resp_tx_ts;
 				int32 rtd_init, rtd_resp;
@@ -87,8 +106,8 @@ static int poll(double * dist) {
 				resp_rx_ts = dwt_readrxtimestamplo32();
 
 				// Get timestamps embedded in response message.
-				resp_msg_get_ts(&rx_buffer[RESP_MSG_POLL_RX_TS_IDX], &poll_rx_ts);
-				resp_msg_get_ts(&rx_buffer[RESP_MSG_RESP_TX_TS_IDX], &resp_tx_ts);
+				poll_rx_ts = ((msg_resp*)(rx_buffer))->pollRxTs;
+				resp_tx_ts = ((msg_resp*)(rx_buffer))->respTxTs;
 
 				// Compute time of flight and distance.
 				rtd_init = resp_rx_ts - poll_tx_ts;
@@ -124,6 +143,10 @@ void tag_run(void)
 
     dwt_configure(&config);
 
+    dwt_setpanid(MAC_PAN_ID);
+    dwt_setaddress16(MAC_SHORT);
+    dwt_enableframefilter(DWT_FF_DATA_EN);
+
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
 
@@ -145,25 +168,5 @@ void tag_run(void)
     }
 }
 
-/*! ------------------------------------------------------------------------------------------------------------------
- * @fn resp_msg_get_ts()
- *
- * @brief Read a given timestamp value from the response message. In the timestamp fields of the response message, the
- *        least significant byte is at the lower address.
- *
- * @param  ts_field  pointer on the first byte of the timestamp field to get
- *         ts  timestamp value
- *
- * @return none
- */
-static void resp_msg_get_ts(uint8 *ts_field, uint32 *ts)
-{
-    int i;
-    *ts = 0;
-    for (i = 0; i < RESP_MSG_TS_LEN; i++)
-    {
-        *ts += ts_field[i] << (i * 8);
-    }
-}
 
 
