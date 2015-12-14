@@ -72,12 +72,23 @@ void anchor_run(void)
 
     dwt_configure(&config);
 
-    dwt_setpanid(MAC_PAN_ID);
-    dwt_setaddress16(MAC_SHORT);
-    dwt_enableframefilter(DWT_FF_DATA_EN);
-
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
+
+    if (cph_config->shortid == 0) {
+    	cph_config->shortid = cph_utils_get_shortid_candidate();
+    	cph_config_write();
+    	TRACE("Generated candidate shortid 0x%04X\r\n", cph_config->shortid);
+    }
+
+    dwt_setpanid(cph_config->panid);
+    dwt_setaddress16(cph_config->shortid);
+    dwt_enableframefilter(DWT_FF_DATA_EN);
+
+
+    rx_poll_msg.mac_dest = cph_config->shortid;
+    tx_resp_msg.mac_source = cph_config->shortid;
+
 
     /* Loop forever responding to ranging requests. */
     while (1)
@@ -94,7 +105,6 @@ void anchor_run(void)
         if (status_reg & SYS_STATUS_RXFCG)
         {
             uint32 frame_len;
-            msg_poll * rx_buffer_poll_msg;
 
             /* Clear good RX frame event in the DW1000 status register. */
             dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
@@ -106,11 +116,8 @@ void anchor_run(void)
                 dwt_readrxdata(rx_buffer, frame_len, 0);
             }
 
-            /* Check that the frame is a poll sent by "SS TWR initiator" example.
-             * As the sequence number field of the frame is not relevant, it is cleared to simplify the validation of the frame. */
-            //rx_buffer[ALL_MSG_SN_IDX] = 0;
-            ((msg_poll*)rx_buffer)->mac_sequence = 0;
-            if (memcmp(rx_buffer, (uint8_t*)&rx_poll_msg, ALL_MSG_COMMON_LEN) == 0)
+            // Look for Poll message
+            if (((msg_poll*)rx_buffer)->functionCode == 0xE0)
             {
                 uint32 resp_tx_time;
 
@@ -130,6 +137,7 @@ void anchor_run(void)
 
                 /* Write and send the response message. See NOTE 9 below. */
                 tx_resp_msg.mac_sequence = 0;
+                tx_resp_msg.mac_dest = ((msg_poll*)rx_buffer)->mac_source;
                 dwt_writetxdata(sizeof(tx_resp_msg), (uint8_t*)&tx_resp_msg, 0);
                 dwt_writetxfctrl(sizeof(tx_resp_msg), 0);
                 int result = dwt_starttx(DWT_START_TX_DELAYED);
@@ -184,6 +192,7 @@ static uint64 get_rx_timestamp_u64(void)
     }
     return ts;
 }
+
 
 
 

@@ -10,15 +10,17 @@
 
 #include <asf.h>
 
-//#define MAIN_TEST
-
-
 #include <cph_millis.h>
 #include <cph_stdio.h>
 #include <cph_queue.h>
+#include <cph_config.h>
+#include <cph_utils.h>
 
-#define	ANCHOR
-//#define TAG
+#define FW_MAJOR				0x01
+#define FW_MINOR				0x01
+
+//#define	ANCHOR
+#define TAG
 
 #define TRACE(...)				printf(__VA_ARGS__)
 
@@ -30,14 +32,14 @@
 
 
 #ifdef ANCHOR
-#define APP_NAME  				"CPH ANCHOR Version 0.01"
+#define APP_NAME  				"CPH ANCHOR Version %2X.%02X\r\n"
 #define MAC_ADDRESS				0x4350010000000077
 #define MAC_SHORT				MAC_ANCHOR_ID
 #define app_run					anchor_run
 void anchor_run(void);
 
 #else
-#define APP_NAME  				"CPH TAG Version 0.01"
+#define APP_NAME  				"CPH TAG Version %2X.%02X\r\n"
 #define MAC_ADDRESS				0x4350010000000078
 #define MAC_SHORT				MAC_TAG_ID
 #define app_run					tag_run
@@ -122,5 +124,19 @@ typedef struct __attribute__((packed)) {
 	uint32_t respTxTs;
 	uint16_t mac_cs;
 } msg_resp;
+
+typedef struct __attribute__((packed)) {
+	uint8_t magic[4];
+	uint8_t hw_major;
+	uint8_t hw_minor;
+	uint8_t fw_major;
+	uint8_t fw_minor;
+	uint16_t panid;
+	uint16_t shortid;
+} cph_config_t;
+
+extern cph_config_t * cph_config;
+
+
 
 #endif /* SRC_CPH_H_ */

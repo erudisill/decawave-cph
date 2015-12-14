@@ -35,6 +35,17 @@ void system_board_init(void);
 /** Name string macro */
 #define BOARD_NAME                "DW_ALPHA"
 
+//#define BOARD_REV_A02
+#define BOARD_REV_A03
+
+#ifdef BOARD_REV_A02
+#define BOARD_REV_MAJOR		0x0A
+#define BOARD_REV_MINOR		0x02
+#endif
+#ifdef BOARD_REV_A03
+#define BOARD_REV_MAJOR		0x0A
+#define BOARD_REV_MINOR		0x03
+#endif
 
 
 
@@ -87,15 +98,30 @@ void system_board_init(void);
 #define DW_SPI_PAD3				PINMUX_PA19C_SERCOM1_PAD3
 #define DW_SPI_TRANSFER_MODE	SPI_TRANSFER_MODE_0
 
+#ifdef BOARD_REV_A02
 #define DW_IRQ_LINE				0
 #define DW_IRQ_PIN				PIN_PA00
 #define DW_IRQ_PIN_MUX			PIN_PA00A_EIC_EXTINT0
+#endif
+#ifdef BOARD_REV_A03
+#define DW_IRQ_LINE				2
+#define DW_IRQ_PIN				PIN_PA02
+#define DW_IRQ_PIN_MUX			PIN_PA02A_EIC_EXTINT2
+#endif
 #define DW_IRQ_PIN_PULL			EXTINT_PULL_NONE
 #define DW_IRQ_PIN_DETECT		EXTINT_DETECT_RISING
 
+#ifdef BOARD_REV_A02
 #define DW_RST_PIN				PIN_PA01
 #define DW_RST_LINE				1
 #define DW_RST_PIN_MUX			PIN_PA01A_EIC_EXTINT1
+#endif
+#ifdef BOARD_REV_A03
+#define DW_RST_PIN				PIN_PA22
+#define DW_RST_LINE				6
+#define DW_RST_PIN_MUX			PIN_PA22A_EIC_EXTINT6
+#endif
+
 #define DW_RST_PIN_PULL			EXTINT_PULL_NONE
 #define DW_RST_PIN_DETECT		EXTINT_DETECT_RISING
 #define DW_RST_PIN_CONFIG		{ PORT_PIN_DIR_INPUT, PORT_PIN_PULL_NONE, false }
