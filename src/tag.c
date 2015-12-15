@@ -23,27 +23,52 @@ static dwt_config_t config = DW_CONFIG;
 /* Frames used in the ranging process.  */
 static msg_poll tx_poll_msg =
 {
-		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac_sequence
 		MAC_PAN_ID,		// mac_panid
 		MAC_ANCHOR_ID,	// mac_dest  	'A' 'W'
 		MAC_TAG_ID,		// mac_source	'E' 'V'
-		0xE0,			// functionCode
+		FUNC_POLL,		// functionCode
 		0x0000			// mac_cs
 };
 
 static msg_resp rx_resp_msg =
 {
-		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac_sequence
 		MAC_PAN_ID,		// mac_panid
 		MAC_TAG_ID,		// mac_dest		'E' 'V'
 		MAC_ANCHOR_ID,	// mac_source  	'A' 'W'
-		0xE1,			// functionCode
+		FUNC_RESP,		// functionCode
 		0x00000000,		// pollRxTs
 		0x00000000,		// respTxTs
 		0x0000			// mac_cs
 };
+
+static msg_discover tx_discover_msg =
+{
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		0xFFFF,			// mac_dest
+		MAC_TAG_ID,		// mac_source
+		FUNC_DISCOVER,	// functionCode
+		0x0000			// mac_cs
+};
+
+static msg_announce rx_announce_msg =
+{
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_ANCHOR_ID,	// mac_dest
+		MAC_TAG_ID,		// mac_source
+		FUNC_ANNOUNCE,	// functionCode
+		0x0000			// mac_cs
+};
+
+// Discovered anchors and their ranges
+static anchor_range_t anchors[MIN_ANCHORS];
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -64,6 +89,9 @@ static double distance;
 
 static int poll(double * dist) {
 	int result = CPH_OK;
+
+    dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
+    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
 	// Setup POLL frame to request to range with anchor
 	tx_poll_msg.mac_sequence = frame_seq_nb;
@@ -134,8 +162,77 @@ static int poll(double * dist) {
     return result;
 }
 
+static int discover(void) {
+	int result = CPH_OK;
+
+    dwt_setrxaftertxdelay(0);
+    //dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
+    dwt_setrxtimeout(600);
+
+	// Setup POLL frame to request to range with anchor
+	tx_discover_msg.mac_sequence = frame_seq_nb;
+    dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+    dwt_writetxdata(sizeof(tx_discover_msg), (uint8_t*)(&tx_discover_msg), 0);
+    dwt_writetxfctrl(sizeof(tx_discover_msg), 0);
+
+    // Start transmission, indicating that a response is expected so that reception is enabled automatically
+    // after the frame is sent and the delay set by dwt_setrxaftertxdelay() has elapsed.
+    dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
+
+    // We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout.
+    while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR)))
+    { };
+
+    // Increment frame sequence number after transmission of the poll message (modulo 256).
+    frame_seq_nb++;
+
+    if (status_reg & SYS_STATUS_RXFCG)
+    {
+        uint32 frame_len;
+
+        // Clear good RX frame event in the DW1000 status register.
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
+
+        // A frame has been received, read it into the local buffer.
+        frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
+        if (frame_len <= sizeof(msg_announce))
+        {
+            dwt_readrxdata(rx_buffer, frame_len, 0);
+
+			// If valid response, store the anchor id (only one for now, for testing)
+            if (((msg_resp*)rx_buffer)->functionCode == FUNC_ANNOUNCE)
+			{
+            	anchors[0].shortid = ((msg_resp*)rx_buffer)->mac_source;
+            	anchors[0].range = 0;
+			}
+			else {
+				result = CPH_BAD_FRAME;
+			}
+        }
+        else {
+        	result = CPH_BAD_LENGTH;
+        }
+    }
+    else
+    {
+        // Clear RX error events in the DW1000 status register.
+        dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+    	result = CPH_ERROR;
+    }
+
+    return result;
+}
+
 void tag_run(void)
 {
+	// Init anchors table
+	for (int i=0;i<MIN_ANCHORS;i++) {
+		anchors[i].shortid = 0;
+		anchors[i].range = 0;
+	}
+
+
+	// Setup DECAWAVE
     reset_DW1000();
     spi_set_rate_low();
     dwt_initialise(DWT_LOADUCODE);
@@ -146,25 +243,41 @@ void tag_run(void)
     dwt_setrxantennadelay(RX_ANT_DLY);
     dwt_settxantennadelay(TX_ANT_DLY);
 
-    dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
-    dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
+    // Determine short id
     if (cph_config->shortid == 0) {
     	cph_config->shortid = cph_utils_get_shortid_candidate();
     	cph_config_write();
     	TRACE("Generated candidate shortid 0x%04X\r\n", cph_config->shortid);
     }
+    tx_poll_msg.mac_source = cph_config->shortid;
+    rx_resp_msg.mac_dest = cph_config->shortid;
+    tx_discover_msg.mac_source = cph_config->shortid;
+    rx_announce_msg.mac_dest = cph_config->shortid;
 
+
+    // Configure network parameters
     dwt_setpanid(cph_config->panid);
     dwt_setaddress16(cph_config->shortid);
     dwt_enableframefilter(DWT_FF_DATA_EN);
 
-    tx_poll_msg.mac_source = cph_config->shortid;
-    tx_poll_msg.mac_dest = ANCHOR_ID;
 
-    rx_resp_msg.mac_source = ANCHOR_ID;
-    rx_resp_msg.mac_dest = cph_config->shortid;
+    // Discover an anchor
+    do  {
+    	printf("Discovering anchors\r\n");
+    	int result = discover();
+    	if (result != CPH_OK) {
+    		printf("ERROR: %d\r\n", result);
+    	}
+        deca_sleep(RNG_DELAY_MS);
+    } while (anchors[0].shortid == 0);
 
+    printf("Anchor discovered: %04X\r\n", anchors[0].shortid);
+
+
+    // Start ranging
+    tx_poll_msg.mac_dest = anchors[0].shortid;
+	rx_resp_msg.mac_source = anchors[0].shortid;
     while (1)
     {
     	int result = poll(&distance);

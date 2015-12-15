@@ -22,27 +22,39 @@ static dwt_config_t config = DW_CONFIG;
 /* Frames used in the ranging process. See NOTE 3 below. */
 static msg_poll rx_poll_msg =
 {
-		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac_sequence
 		MAC_PAN_ID,		// mac_panid
 		MAC_ANCHOR_ID,	// mac_dest
 		MAC_TAG_ID,		// mac_source
-		0xE0,			// functionCode
+		FUNC_POLL,		// functionCode
 		0x0000			// mac_cs
 };
 
 static msg_resp tx_resp_msg =
 {
-		0x8841,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac_sequence
 		MAC_PAN_ID,		// mac_panid
 		MAC_TAG_ID,		// mac_dest
 		MAC_ANCHOR_ID,	// mac_source
-		0xE1,			// functionCode
+		FUNC_RESP,		// functionCode
 		0x00000000,		// pollRxTs
 		0x00000000,		// respTxTs
 		0x0000			// mac_cs
 };
+
+static msg_announce tx_announce_msg =
+{
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_TAG_ID,		// mac_dest
+		MAC_ANCHOR_ID,	// mac_source
+		FUNC_ANNOUNCE,	// functionCode
+		0x0000			// mac_cs
+};
+
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
 
@@ -88,6 +100,7 @@ void anchor_run(void)
 
     rx_poll_msg.mac_dest = cph_config->shortid;
     tx_resp_msg.mac_source = cph_config->shortid;
+    tx_announce_msg.mac_source = cph_config->shortid;
 
 
     /* Loop forever responding to ranging requests. */
@@ -117,7 +130,7 @@ void anchor_run(void)
             }
 
             // Look for Poll message
-            if (((msg_poll*)rx_buffer)->functionCode == 0xE0)
+            if (((msg_poll*)rx_buffer)->functionCode == FUNC_POLL)
             {
                 uint32 resp_tx_time;
 
@@ -150,7 +163,32 @@ void anchor_run(void)
 					printf("SUCCESS: dwt_startx response sent %d\r\n", frame_seq_nb);
                 }
                 else {
-                	printf("ERROR: dwt_starttx returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result, resp_tx_time, ts);
+                	printf("ERROR: dwt_starttx response returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result, resp_tx_time, ts);
+                }
+
+                /* Clear TXFRS event. */
+                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+
+                /* Increment frame sequence number after transmission of the poll message (modulo 256). */
+                frame_seq_nb++;
+            }
+            else if (((msg_poll*)rx_buffer)->functionCode == FUNC_DISCOVER) {
+                /* Write and send the announce message. */
+                tx_announce_msg.mac_sequence = 0;
+                tx_announce_msg.mac_dest = ((msg_poll*)rx_buffer)->mac_source;
+                dwt_writetxdata(sizeof(tx_announce_msg), (uint8_t*)&tx_announce_msg, 0);
+                dwt_writetxfctrl(sizeof(tx_announce_msg), 0);
+                int result = dwt_starttx(DWT_START_TX_IMMEDIATE);
+            	uint32_t ts = dwt_readsystimestamphi32();
+
+                if (result == DWT_SUCCESS) {
+					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
+					while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
+					{ };
+					printf("SUCCESS: dwt_startx announce sent %d\r\n", frame_seq_nb);
+                }
+                else {
+                	printf("ERROR: dwt_starttx announce returned %d\r\n");
                 }
 
                 /* Clear TXFRS event. */
