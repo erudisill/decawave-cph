@@ -84,11 +84,61 @@ typedef unsigned long long uint64;
 static uint64 poll_rx_ts;
 static uint64 resp_tx_ts;
 
+/* List of paired tags */
+static pair_info_t paired_tags[MAX_TAGS];
+
 /* Declaration of static functions. */
 static uint64 get_rx_timestamp_u64(void);
 
+static bool can_respond_to_discover(uint16_t shortid) {
+	for (int i=0;i<MAX_TAGS;i++) {
+		if (paired_tags[i].shortid == shortid) {
+			uint32_t elapsed = g_cph_millis - paired_tags[i].paired_ts;
+			if (elapsed < PAIR_LIFETIME) {
+				// Already paired - return no
+				return false;
+			}
+			else {
+				// Paired, but timed out - return yes
+				return true;
+			}
+		}
+	}
+	// No pair found - return yes
+	return true;
+}
+
+static bool update_paired_tags(uint16_t shortid) {
+	int first_empty = -1;
+	int i = 0;
+
+	for (i=0;i<MAX_TAGS;i++) {
+		if (paired_tags[i].shortid == 0 && first_empty == -1)
+			first_empty = i;
+		if (paired_tags[i].shortid == shortid) {
+			// Found tag, update timestamp and return success
+			paired_tags[i].paired_ts = g_cph_millis;
+			return true;
+		}
+	}
+
+	// Not found, so try and add it
+	if (first_empty == -1) {
+		// No empty slot, return fail
+		return false;
+	}
+
+	paired_tags[first_empty].shortid = shortid;
+	paired_tags[first_empty].paired_ts = g_cph_millis;
+	return true;
+
+}
+
+
 void anchor_run(void)
 {
+	memset(paired_tags, 0, sizeof(pair_info_t) * MAX_TAGS);
+
     reset_DW1000();
     spi_set_rate_low();
     dwt_initialise(DWT_LOADUCODE);
@@ -186,34 +236,43 @@ void anchor_run(void)
                 frame_seq_nb++;
             }
             else if (((msg_poll*)rx_buffer)->functionCode == FUNC_DISCOVER) {
-                /* Write and send the announce message. */
-                tx_announce_msg.mac_sequence = 0;
-                tx_announce_msg.mac_dest = ((msg_poll*)rx_buffer)->mac_source;
-                dwt_writetxdata(sizeof(tx_announce_msg), (uint8_t*)&tx_announce_msg, 0);
-                dwt_writetxfctrl(sizeof(tx_announce_msg), 0);
-                int result = dwt_starttx(DWT_START_TX_IMMEDIATE);
 
-                if (result == DWT_SUCCESS) {
-					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
-					while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
-					{ };
+            	if (can_respond_to_discover(((msg_poll*)rx_buffer)->mac_source)) {
+					/* Write and send the announce message. */
+					tx_announce_msg.mac_sequence = 0;
+					tx_announce_msg.mac_dest = ((msg_poll*)rx_buffer)->mac_source;
+					dwt_writetxdata(sizeof(tx_announce_msg), (uint8_t*)&tx_announce_msg, 0);
+					dwt_writetxfctrl(sizeof(tx_announce_msg), 0);
+					int result = dwt_starttx(DWT_START_TX_IMMEDIATE);
 
-					//printf("SUCCESS: dwt_startx announce sent to %04X .. seq %d .. status_reg:%08X\r\n", tx_announce_msg.mac_dest, frame_seq_nb, status_reg);
-                }
-                else {
-                	printf("ERROR: dwt_starttx announce returned %d\r\n");
-                }
+					if (result == DWT_SUCCESS) {
+						/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
+						while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
+						{ };
+					}
+					else {
+						printf("ERROR: dwt_starttx announce returned %d\r\n");
+					}
 
-                /* Clear TXFRS event. */
-                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+					/* Clear TXFRS event. */
+					dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 
-                /* Increment frame sequence number after transmission of the poll message (modulo 256). */
-                frame_seq_nb++;
+					/* Increment frame sequence number after transmission of the poll message (modulo 256). */
+					frame_seq_nb++;
+            	}
+            	else {
+            		printf("ignoring pair with %04X\r\n", ((msg_poll*)rx_buffer)->mac_source);
+            	}
             }
             else if (((msg_poll*)rx_buffer)->functionCode == FUNC_PAIR) {
             	//TODO: Record the pairing details and check them when receiving a discover request
                 //      For now, nothing to do
-            	printf("paired with %04X\r\n", ((msg_pair*)rx_buffer)->mac_source);
+            	if (update_paired_tags(((msg_poll*)rx_buffer)->mac_source)) {
+            		printf("paired with %04X\r\n", ((msg_poll*)rx_buffer)->mac_source);
+            	}
+            	else {
+            		printf("failed to pair with %04X\r\n", ((msg_poll*)rx_buffer)->mac_source);
+            	}
 
             }
             else {

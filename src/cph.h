@@ -100,6 +100,12 @@ void tag_run(void);
 // Min Number of anchors to range with
 #define MIN_ANCHORS		3
 
+// Max number of tags to pair with
+#define MAX_TAGS		32
+
+// Lifetime of tag pairing
+#define PAIR_LIFETIME	5000
+
 // Delay to start listening after discover
 #define DISCOVER_TX_TO_ANNOUNCE_RX_DELAY_UUS	400
 #define DISCOVER_RX_TO_ANNOUNCE_TX_DELAY_UUS	460
@@ -176,7 +182,10 @@ typedef struct PACKED {
 	double range;
 } anchor_range_t;
 
-
+typedef struct PACKED {
+	uint16_t shortid;
+	uint32_t paired_ts;
+} pair_info_t;
 
 
 typedef struct PACKED {

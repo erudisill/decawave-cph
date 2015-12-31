@@ -106,13 +106,6 @@ static int poll(double * dist) {
 	// after the frame is sent and the delay set by dwt_setrxaftertxdelay() has elapsed.
 	dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
 
-
-//	status_reg = dwt_read32bitreg(SYS_STATUS_ID);
-//	printf("poll: incoming status_reg = %08X\r\n", status_reg);
-//	printf("abcdefghijklmnopqrstuvwxyz\r\n");
-//	printf("abcdefghi\r\n");
-
-
 	// We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout.
 	while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
 	};
