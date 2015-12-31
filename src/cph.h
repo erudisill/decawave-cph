@@ -19,8 +19,8 @@
 #define FW_MAJOR				0x01
 #define FW_MINOR				0x01
 
-#define	ANCHOR
-//#define TAG
+//#define	ANCHOR
+#define TAG
 
 #define TRACE(...)				printf(__VA_ARGS__)
 
@@ -30,6 +30,7 @@
 #define MAC_ANCHOR_ID			0x4157
 #define MAC_TAG_ID				0x4556
 #define MAC_FC					0x8841
+#define MAC_FC_ACK				0x8861
 
 #ifdef ANCHOR
 #define APP_NAME  				"CPH ANCHOR Version %2X.%02X\r\n"
@@ -114,6 +115,7 @@ enum {
 #define FUNC_RESP		0xE1
 #define FUNC_DISCOVER	0xE2
 #define FUNC_ANNOUNCE	0xE3
+#define FUNC_PAIR		0xE4
 
 #define PACKED	__attribute__((packed))
 
@@ -158,6 +160,16 @@ typedef struct PACKED {
 	uint8_t functionCode;
 	uint16_t mac_cs;
 } msg_announce;
+
+typedef struct PACKED {
+	uint16_t mac_frameControl;
+	uint8_t mac_sequence;
+	uint16_t mac_panid;
+	uint16_t mac_dest;
+	uint16_t mac_source;
+	uint8_t functionCode;
+	uint16_t mac_cs;
+} msg_pair;
 
 typedef struct PACKED {
 	uint16_t shortid;

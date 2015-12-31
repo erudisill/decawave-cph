@@ -55,6 +55,18 @@ static msg_announce tx_announce_msg =
 		0x0000			// mac_cs
 };
 
+static msg_announce rx_pair_msg =
+{
+		MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_TAG_ID,		// mac_dest
+		MAC_ANCHOR_ID,	// mac_source
+		FUNC_PAIR,		// functionCode
+		0x0000			// mac_cs
+};
+
+
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
 
@@ -101,6 +113,7 @@ void anchor_run(void)
     rx_poll_msg.mac_dest = cph_config->shortid;
     tx_resp_msg.mac_source = cph_config->shortid;
     tx_announce_msg.mac_source = cph_config->shortid;
+    rx_pair_msg.mac_dest = cph_config->shortid;
 
 
     /* Loop forever responding to ranging requests. */
@@ -158,9 +171,9 @@ void anchor_run(void)
 
                 if (result == DWT_SUCCESS) {
 					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
-					while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
+					while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
 					{ };
-					printf("SUCCESS: dwt_startx response sent %d\r\n", frame_seq_nb);
+					printf("SUCCESS: dwt_startx response sent %d .. status_reg:%08X\r\n", frame_seq_nb, status_reg);
                 }
                 else {
                 	printf("ERROR: dwt_starttx response returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result, resp_tx_time, ts);
@@ -179,13 +192,13 @@ void anchor_run(void)
                 dwt_writetxdata(sizeof(tx_announce_msg), (uint8_t*)&tx_announce_msg, 0);
                 dwt_writetxfctrl(sizeof(tx_announce_msg), 0);
                 int result = dwt_starttx(DWT_START_TX_IMMEDIATE);
-            	uint32_t ts = dwt_readsystimestamphi32();
 
                 if (result == DWT_SUCCESS) {
 					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
-					while (!(dwt_read32bitreg(SYS_STATUS_ID) & SYS_STATUS_TXFRS))
+					while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
 					{ };
-					printf("SUCCESS: dwt_startx announce sent %d\r\n", frame_seq_nb);
+
+					//printf("SUCCESS: dwt_startx announce sent to %04X .. seq %d .. status_reg:%08X\r\n", tx_announce_msg.mac_dest, frame_seq_nb, status_reg);
                 }
                 else {
                 	printf("ERROR: dwt_starttx announce returned %d\r\n");
@@ -196,6 +209,18 @@ void anchor_run(void)
 
                 /* Increment frame sequence number after transmission of the poll message (modulo 256). */
                 frame_seq_nb++;
+            }
+            else if (((msg_poll*)rx_buffer)->functionCode == FUNC_PAIR) {
+            	//TODO: Record the pairing details and check them when receiving a discover request
+                //      For now, nothing to do
+            	printf("paired with %04X\r\n", ((msg_pair*)rx_buffer)->mac_source);
+
+            }
+            else {
+            	printf("ERROR: unknown function code - data: ");
+            	for (int i=0;i<frame_len;i++)
+            		printf("%02X ", rx_buffer[i]);
+            	printf("\r\n");
             }
         }
         else
@@ -230,9 +255,3 @@ static uint64 get_rx_timestamp_u64(void)
     }
     return ts;
 }
-
-
-
-
-
-
