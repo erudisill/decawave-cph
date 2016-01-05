@@ -73,7 +73,8 @@ MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short de
 		};
 
 // Discovered anchors and their ranges
-static anchor_range_t anchors[MIN_ANCHORS];
+static anchor_range_t anchors[ANCHORS_MIN];
+static unsigned int anchors_status;
 
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
@@ -150,7 +151,7 @@ static int poll(double * dist) {
 			result = CPH_BAD_LENGTH;
 		}
 	} else {
-		printf("STATUS: %08X\r\n", status_reg);
+//		printf("STATUS: %08X\r\n", status_reg);
 		// Clear RX error events in the DW1000 status register.
 		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
 		result = CPH_ERROR;
@@ -159,7 +160,7 @@ static int poll(double * dist) {
 	return result;
 }
 
-static int discover(void) {
+static int discover(int idx) {
 	int result = CPH_OK;
 
 	dwt_setrxaftertxdelay(0);
@@ -193,14 +194,14 @@ static int discover(void) {
 		if (frame_len <= sizeof(msg_announce)) {
 			dwt_readrxdata(rx_buffer, frame_len, 0);
 
-			// If valid response, store the anchor id (only one for now, for testing)
+			// If valid response, send the reply
 			if (((msg_resp*) rx_buffer)->functionCode == FUNC_ANNOUNCE) {
-//TESTING		anchors[0].shortid = ((msg_resp*) rx_buffer)->mac_source;
-				anchors[0].range = 0;
+
+				uint16_t shortid = ((msg_resp*) rx_buffer)->mac_source;
 
 				// Now send the pair response back
 				tx_pair_msg.mac_sequence = frame_seq_nb;
-				tx_pair_msg.mac_dest = ((msg_resp*) rx_buffer)->mac_source;
+				tx_pair_msg.mac_dest = shortid;
 				dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 				dwt_writetxdata(sizeof(tx_pair_msg), (uint8_t*) (&tx_pair_msg), 0);
 				dwt_writetxfctrl(sizeof(tx_pair_msg), 0);
@@ -210,6 +211,21 @@ static int discover(void) {
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
                 frame_seq_nb++;
 
+                // Check for duplicate
+				for (int i=0;i<ANCHORS_MIN;i++) {
+					if (anchors[i].shortid == shortid) {
+		                printf("shortid %04X already exists in anchors[%d]\r\n", shortid, i);
+		                result = CPH_DUPLICATE;
+		                break;
+					}
+				}
+
+				// Not a duplicate so store the shortid
+				if (result == CPH_OK) {
+					anchors[idx].shortid = shortid;
+					anchors[idx].range = 0;
+				}
+
 			} else {
 				result = CPH_BAD_FRAME;
 			}
@@ -217,8 +233,8 @@ static int discover(void) {
 			result = CPH_BAD_LENGTH;
 		}
 	} else {
-		status_reg = dwt_read32bitreg(SYS_STATUS_ID);
-		printf("discover: error status_reg:%08X\r\n", status_reg);
+//		status_reg = dwt_read32bitreg(SYS_STATUS_ID);
+//		printf("discover: error status_reg:%08X\r\n", status_reg);
 		// Clear RX error events in the DW1000 status register.
 		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
 		result = CPH_ERROR;
@@ -227,12 +243,49 @@ static int discover(void) {
 	return result;
 }
 
-void tag_run(void) {
+void init_anchors(void) {
 	// Init anchors table
-	for (int i = 0; i < MIN_ANCHORS; i++) {
+	for (int i = 0; i < ANCHORS_MIN; i++) {
 		anchors[i].shortid = 0;
 		anchors[i].range = 0;
 	}
+	anchors_status = ANCHORS_MASK;
+}
+
+void refresh_anchors(void) {
+
+	init_anchors();
+
+	// Discover anchors
+	uint32_t anchor_refresh_ts = 0;
+	while (anchors_status) {
+		printf("Discovering anchors .. anchors_status:%02X\r\n", anchors_status);
+
+		// Check for refresh of anchors
+		uint32_t elapsed = cph_get_millis() - anchor_refresh_ts;
+		if (elapsed > ANCHORS_REFRESH_INTERVAL) {
+			printf("Anchors discovery timeout.  anchors_status:%02X\r\n", anchors_status);
+			init_anchors();
+			anchor_refresh_ts = cph_get_millis();
+		}
+
+		for (int i=0;i<ANCHORS_MIN;i++) {
+			if (anchors_status & (1 << i)) {
+				int result = discover(i);
+				if (result == CPH_OK) {
+					anchors_status &= (~(1 << i));
+					printf("anchor[%d] %04X\r\n", i, anchors[i].shortid);
+				}
+				deca_sleep(RNG_DELAY_MS);
+			}
+		}
+		deca_sleep(POLL_DELAY_MS);
+	}
+
+	printf("Anchors discovered. Moving to poll.  anchors_status:%02X\r\n", anchors_status);
+}
+
+void tag_run(void) {
 
 	// Setup DECAWAVE
 	reset_DW1000();
@@ -262,31 +315,62 @@ void tag_run(void) {
 	dwt_setaddress16(cph_config->shortid);
 	dwt_enableframefilter(DWT_FF_DATA_EN);
 
-	// Discover an anchor
-	do {
-		printf("\r\n\r\nDiscovering anchors\r\n");
-		int result = discover();
-		if (result != CPH_OK) {
-			printf("DISC ERROR: %d\r\n", result);
-		}
-		deca_sleep(RNG_DELAY_MS);
-	} while (anchors[0].shortid == 0);
 
-	printf("Anchor discovered: %04X\r\n", anchors[0].shortid);
+	// First, discover anchors
+	uint32_t anchor_refresh_ts = 0;
+	refresh_anchors();
+	anchor_refresh_ts = cph_get_millis();
 
-	// Start ranging
-	tx_poll_msg.mac_dest = anchors[0].shortid;
-	rx_resp_msg.mac_source = anchors[0].shortid;
+	// Poll loop
 	while (1) {
-		int result = poll(&distance);
-		if (result == CPH_OK) {
-			printf("DIST: %3.2f m\r\n", distance);
-		} else {
-			printf("POLL ERROR: %d\r\n", result);
+
+		int ranges_countdown = MAX_RANGES_BEFORE_POLL_TIMEOUT;
+		anchors_status = ANCHORS_MASK;
+
+		while (anchors_status && (--ranges_countdown)) {
+
+			// Check for refresh of anchors
+			uint32_t elapsed = cph_get_millis() - anchor_refresh_ts;
+			if (elapsed > ANCHORS_REFRESH_INTERVAL) {
+				printf("Anchors refresh timeout.  anchors_status:%02X\r\n", anchors_status);
+				refresh_anchors();
+				anchor_refresh_ts = cph_get_millis();
+				// Since we refreshed the anchors, need to range again for ALL anchors during this poll
+				anchors_status = ANCHORS_MASK;
+			}
+
+			// Range each anchor once during this poll
+			for (int i = 0; i < ANCHORS_MIN; i++) {
+				if (anchors_status & (1 << i)) {
+					tx_poll_msg.mac_dest = anchors[i].shortid;
+					rx_resp_msg.mac_source = anchors[i].shortid;
+					anchors[i].range = 0;
+					int result = poll(&anchors[i].range);
+
+					if (result == CPH_OK) {
+						anchors_status &= (~(1 << i));
+					}
+
+					deca_sleep(RNG_DELAY_MS);
+				}
+			}
+
+			deca_sleep(RNG_DELAY_MS);
+		}
+
+		if (ranges_countdown) {
+			printf("%d ", ranges_countdown);
+			for (int i = 0; i < ANCHORS_MIN; i++) {
+				printf("%04X: %3.2f m\t", anchors[i].shortid, anchors[i].range);
+			}
+			printf("\r\n");
+		}
+		else {
+			printf("ranges_countdown expired!\r\n");
 		}
 
 		// Execute a delay between ranging exchanges.
-		deca_sleep(RNG_DELAY_MS);
+		deca_sleep(POLL_DELAY_MS);
 	}
 }
 

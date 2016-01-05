@@ -34,10 +34,20 @@ cph_config_t * cph_config;
 
 
 static void init_config(void) {
+	bool do_reset = false;
+
 	cph_config = (cph_config_t*)cph_config_init();
 
-	// If no magic, first run. Set defaults and save
+	// If no magic, first run.
 	if (cph_config->magic[0] != 'C' || cph_config->magic[1] != 'P' || cph_config->magic[2] != 'H' || cph_config->magic[3] != 'T') {
+		do_reset = true;
+	}
+	// Not the first run, but if FW versions don't match, reset
+	else if (cph_config->fw_major != FW_MAJOR || cph_config->fw_minor != FW_MINOR) {
+		do_reset = true;
+	}
+
+	if (do_reset) {
 		cph_config->magic[0] = 'C';
 		cph_config->magic[1] = 'P';
 		cph_config->magic[2] = 'H';

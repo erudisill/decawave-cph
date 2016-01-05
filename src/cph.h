@@ -40,7 +40,7 @@
 void anchor_run(void);
 
 #else
-#define APP_NAME  				"CPH TAG Version %2X.%02X\r\n"
+#define APP_NAME  				"\r\nCPH TAG Version %2X.%02X\r\n"
 #define MAC_ADDRESS				0x4350010000000078
 #define MAC_SHORT				MAC_TAG_ID
 #define app_run					tag_run
@@ -65,7 +65,10 @@ void tag_run(void);
 
 
 /* Inter-ranging delay period, in milliseconds. */
-#define RNG_DELAY_MS 1000
+#define RNG_DELAY_MS 	5
+
+/* Inter-poll delay period, in milliseconds */
+#define POLL_DELAY_MS 	200
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
 #define TX_ANT_DLY 16436
@@ -98,7 +101,16 @@ void tag_run(void);
 
 
 // Min Number of anchors to range with
-#define MIN_ANCHORS		3
+#define ANCHORS_MIN		2
+
+// Used for tracking status of anchor ids (by bitmask) during discovery and poll
+#define ANCHORS_MASK	0x03
+
+// Anchor refresh interval
+#define ANCHORS_REFRESH_INTERVAL	10000
+
+// Max ranges before poll timeout - keeps from blasting radio when an anchor is not responding
+#define MAX_RANGES_BEFORE_POLL_TIMEOUT	5
 
 // Max number of tags to pair with
 #define MAX_TAGS		32
@@ -114,7 +126,8 @@ enum {
 	CPH_OK = 0,
 	CPH_ERROR,
 	CPH_BAD_FRAME,
-	CPH_BAD_LENGTH
+	CPH_BAD_LENGTH,
+	CPH_DUPLICATE
 };
 
 #define	FUNC_POLL		0xE0
