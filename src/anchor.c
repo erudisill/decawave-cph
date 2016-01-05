@@ -159,6 +159,9 @@ void anchor_run(void)
     dwt_setaddress16(cph_config->shortid);
     dwt_enableframefilter(DWT_FF_DATA_EN);
 
+//    // Disable interrupt on frame rejection
+//    dwt_setinterrupt(DWT_INT_ARFE, 0);
+//    dwt_setautorxreenable(1);
 
     rx_poll_msg.mac_dest = cph_config->shortid;
     tx_resp_msg.mac_source = cph_config->shortid;
@@ -223,7 +226,7 @@ void anchor_run(void)
 					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
 					while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
 					{ };
-					printf("SUCCESS: dwt_startx response sent %d .. status_reg:%08X\r\n", frame_seq_nb, status_reg);
+					//printf("SUCCESS: dwt_startx response sent %d .. status_reg:%08X\r\n", frame_seq_nb, status_reg);
                 }
                 else {
                 	printf("ERROR: dwt_starttx response returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result, resp_tx_time, ts);
@@ -284,9 +287,13 @@ void anchor_run(void)
         }
         else
         {
-        	printf("ERROR: dwt_rxenable has status of %08X\r\n", status_reg);
-            /* Clear RX error events in the DW1000 status register. */
-            dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+        	// Ignore frame rejections
+        	uint32_t test = status_reg & (~SYS_STATUS_AFFREJ);
+        	if (test & SYS_STATUS_ALL_RX_ERR) {
+				printf("ERROR: dwt_rxenable has status of %08X\r\n", status_reg);
+				/* Clear RX error events in the DW1000 status register. */
+				dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+        	}
         }
     }
 }
