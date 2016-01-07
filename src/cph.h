@@ -100,14 +100,20 @@ void tag_run(void);
 #define SPEED_OF_LIGHT 299702547
 
 
-// Min Number of anchors to range with
-#define ANCHORS_MIN		2
+// Min Number of anchors to range with - if this changes, so should ANCHORS_MASK
+#define ANCHORS_MIN		3
 
 // Used for tracking status of anchor ids (by bitmask) during discovery and poll
-#define ANCHORS_MASK	0x03
+#define ANCHORS_MASK	0x07
 
 // Anchor refresh interval
 #define ANCHORS_REFRESH_INTERVAL	10000
+
+// Coord announce startup burst repeat count
+#define COORD_ANNOUNCE_START_BURST	10
+
+// Coord announce period in ms
+#define COORD_ANNOUNCE_INTERVAL		7000
 
 // Max ranges before poll timeout - keeps from blasting radio when an anchor is not responding
 #define MAX_RANGES_BEFORE_POLL_TIMEOUT	5
@@ -130,11 +136,18 @@ enum {
 	CPH_DUPLICATE
 };
 
-#define	FUNC_POLL		0xE0
-#define FUNC_RESP		0xE1
-#define FUNC_DISCOVER	0xE2
-#define FUNC_ANNOUNCE	0xE3
-#define FUNC_PAIR		0xE4
+enum {
+	CPH_MODE_ANCHOR = 0x01,
+	CPH_MODE_TAG = 0x02,
+	CPH_MODE_COORD = 0x80
+};
+
+#define	FUNC_POLL				0xE0
+#define FUNC_RESP				0xE1
+#define FUNC_DISCOVER			0xE2
+#define FUNC_ANNOUNCE_ANCHOR	0xE3
+#define FUNC_PAIR				0xE4
+#define FUNC_ANNOUNCE_COORD		0xE5
 
 #define PACKED	__attribute__((packed))
 
@@ -178,7 +191,7 @@ typedef struct PACKED {
 	uint16_t mac_source;
 	uint8_t functionCode;
 	uint16_t mac_cs;
-} msg_announce;
+} msg_announce_anchor;
 
 typedef struct PACKED {
 	uint16_t mac_frameControl;
@@ -189,6 +202,17 @@ typedef struct PACKED {
 	uint8_t functionCode;
 	uint16_t mac_cs;
 } msg_pair;
+
+typedef struct PACKED {
+	uint16_t mac_frameControl;
+	uint8_t mac_sequence;
+	uint16_t mac_panid;
+	uint16_t mac_dest;
+	uint16_t mac_source;
+	uint8_t functionCode;
+	uint16_t coordid;
+	uint16_t mac_cs;
+} msg_announce_coord;
 
 typedef struct PACKED {
 	uint16_t shortid;
@@ -213,5 +237,8 @@ typedef struct PACKED {
 
 extern cph_config_t * cph_config;
 
+extern int cph_mode;
+
+extern uint16_t cph_coordid;
 
 #endif /* SRC_CPH_H_ */

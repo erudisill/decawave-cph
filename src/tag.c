@@ -52,13 +52,13 @@ MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short de
 		0x0000			// mac_cs
 		};
 
-static msg_announce rx_announce_msg = {
+static msg_announce_anchor rx_announce_msg = {
 MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac_sequence
 		MAC_PAN_ID,		// mac_panid
 		MAC_ANCHOR_ID,	// mac_dest
 		MAC_TAG_ID,		// mac_source
-		FUNC_ANNOUNCE,	// functionCode
+		FUNC_ANNOUNCE_ANCHOR,	// functionCode
 		0x0000			// mac_cs
 		};
 
@@ -91,7 +91,7 @@ static uint32 status_reg = 0;
 static double tof;
 static double distance;
 
-static int poll(double * dist) {
+static int range(double * dist) {
 	int result = CPH_OK;
 
 	dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
@@ -191,11 +191,11 @@ static int discover(int idx) {
 
 		// A frame has been received, read it into the local buffer.
 		frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-		if (frame_len <= sizeof(msg_announce)) {
+		if (frame_len <= sizeof(msg_announce_anchor)) {
 			dwt_readrxdata(rx_buffer, frame_len, 0);
 
 			// If valid response, send the reply
-			if (((msg_resp*) rx_buffer)->functionCode == FUNC_ANNOUNCE) {
+			if (((msg_resp*) rx_buffer)->functionCode == FUNC_ANNOUNCE_ANCHOR) {
 
 				uint16_t shortid = ((msg_resp*) rx_buffer)->mac_source;
 
@@ -345,7 +345,7 @@ void tag_run(void) {
 					tx_poll_msg.mac_dest = anchors[i].shortid;
 					rx_resp_msg.mac_source = anchors[i].shortid;
 					anchors[i].range = 0;
-					int result = poll(&anchors[i].range);
+					int result = range(&anchors[i].range);
 
 					if (result == CPH_OK) {
 						anchors_status &= (~(1 << i));

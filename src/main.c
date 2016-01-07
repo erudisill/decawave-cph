@@ -32,6 +32,13 @@
 
 cph_config_t * cph_config;
 
+#ifdef ANCHOR
+int cph_mode = CPH_MODE_ANCHOR;
+#else
+int cph_mode = CPH_MODE_TAG;
+#endif
+
+uint16_t cph_coordid = 0;
 
 static void init_config(void) {
 	bool do_reset = false;
@@ -83,6 +90,15 @@ int main(void) {
 
 	// Blink LED for 5 seconds
 	for (int i = 0; i < (5 * 4); i++) {
+		if (cph_mode & CPH_MODE_ANCHOR)
+		{
+			char c = SERCOM0->USART.DATA.reg;
+			if (c == 'c') {
+				cph_mode |= CPH_MODE_COORD;
+				printf("IS COORDINATOR\r\n", c);
+				break;
+			}
+		}
 		port_pin_set_output_level(LED_PIN, false);
 		cph_millis_delay(125);
 		port_pin_set_output_level(LED_PIN, true);
