@@ -148,6 +148,7 @@ enum {
 #define FUNC_ANNOUNCE_ANCHOR	0xE3
 #define FUNC_PAIR				0xE4
 #define FUNC_ANNOUNCE_COORD		0xE5
+#define FUNC_RANGE_RESULTS		0xE6
 
 #define PACKED	__attribute__((packed))
 
@@ -190,6 +191,7 @@ typedef struct PACKED {
 	uint16_t mac_dest;
 	uint16_t mac_source;
 	uint8_t functionCode;
+	uint16_t coordid;
 	uint16_t mac_cs;
 } msg_announce_anchor;
 
@@ -223,6 +225,18 @@ typedef struct PACKED {
 	uint16_t shortid;
 	uint32_t paired_ts;
 } pair_info_t;
+
+typedef struct PACKED {
+	uint16_t mac_frameControl;
+	uint8_t mac_sequence;
+	uint16_t mac_panid;
+	uint16_t mac_dest;
+	uint16_t mac_source;
+	uint8_t functionCode;
+	uint8_t numranges;
+	anchor_range_t ranges[ANCHORS_MIN];		//TODO: Make this dynamic
+	uint16_t mac_fs;
+} msg_range_results;
 
 
 typedef struct PACKED {

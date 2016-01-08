@@ -47,6 +47,7 @@ MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short de
 		MAC_TAG_ID,		// mac_dest
 		MAC_ANCHOR_ID,	// mac_source
 		FUNC_ANNOUNCE_ANCHOR,	// functionCode
+		0x0000,			// coordid
 		0x0000			// mac_cs
 		};
 
@@ -70,6 +71,18 @@ MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short de
 		0x0000			// mac_cs
 		};
 
+static msg_range_results rx_range_results_msg = {
+MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_TAG_ID,	// mac_dest
+		MAC_ANCHOR_ID,		// mac_source
+		FUNC_RANGE_RESULTS,		// functionCode
+		0,				// num ranges
+		0,		// results
+		0x0000			// mac_cs
+		};
+
 /* Frame sequence number, incremented after each transmission. */
 static uint8 frame_seq_nb = 0;
 
@@ -89,10 +102,6 @@ static uint64 resp_tx_ts;
 
 /* List of paired tags */
 static pair_info_t paired_tags[MAX_TAGS];
-
-/* Timer for sending coordinator announcements */
-static uint32_t announce_coord_ts = 0;
-
 
 /* Declaration of static functions. */
 static uint64 get_rx_timestamp_u64(void);
@@ -164,11 +173,10 @@ static void announce_coord(int repeat) {
 		frame_seq_nb++;
 		deca_sleep(10);
 	}
-
-	announce_coord_ts = cph_get_millis();
 }
 
 void anchor_run(void) {
+	uint32_t announce_coord_ts = 0;
 	uint32_t elapsed = 0;
 
 	memset(paired_tags, 0, sizeof(pair_info_t) * MAX_TAGS);
@@ -218,7 +226,9 @@ void anchor_run(void) {
 		if (cph_coordid) {
 			elapsed = cph_get_millis() - announce_coord_ts;
 			if (elapsed > COORD_ANNOUNCE_INTERVAL) {
+				printf("elapsed %08X\tts %08X\tmillis %08X\r\n", elapsed, announce_coord_ts, cph_get_millis());
 				announce_coord(1);
+				announce_coord_ts = cph_get_millis();
 			}
 		}
 
@@ -287,6 +297,7 @@ void anchor_run(void) {
 				if (can_respond_to_discover(((msg_poll*) rx_buffer)->mac_source)) {
 					/* Write and send the announce message. */
 					tx_announce_anchor_msg.mac_sequence = 0;
+					tx_announce_anchor_msg.coordid = cph_coordid;
 					tx_announce_anchor_msg.mac_dest = ((msg_poll*) rx_buffer)->mac_source;
 					dwt_writetxdata(sizeof(tx_announce_anchor_msg), (uint8_t*) &tx_announce_anchor_msg, 0);
 					dwt_writetxfctrl(sizeof(tx_announce_anchor_msg), 0);
@@ -332,6 +343,14 @@ void anchor_run(void) {
 						cph_mode &= (~CPH_MODE_COORD);
 					}
 				}
+			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_RANGE_RESULTS) {
+				msg_range_results * results = ((msg_range_results*) rx_buffer);
+				printf("* %04X", cph_coordid);
+				for (int i = 0; i < results->numranges; i++) {
+					printf(" %04X:%3.2f", results->ranges[i].shortid, results->ranges[i].range);
+				}
+				printf("\r\n");
+
 			} else {
 				printf("ERROR: unknown function code - data: ");
 				for (int i = 0; i < frame_len; i++)

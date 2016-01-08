@@ -72,6 +72,20 @@ MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short de
 		0x0000			// mac_cs
 		};
 
+
+static msg_range_results tx_range_results_msg = {
+MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac_sequence
+		MAC_PAN_ID,		// mac_panid
+		MAC_ANCHOR_ID,	// mac_dest
+		MAC_TAG_ID,		// mac_source
+		FUNC_RANGE_RESULTS,		// functionCode
+		0,				// num ranges
+		0,		// results
+		0x0000			// mac_cs
+		};
+
+
 // Discovered anchors and their ranges
 static anchor_range_t anchors[ANCHORS_MIN];
 static unsigned int anchors_status;
@@ -211,6 +225,12 @@ static int discover(int idx) {
                 dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
                 frame_seq_nb++;
 
+                // Grab the coordinator id
+                if (((msg_announce_anchor*) rx_buffer)->coordid != cph_coordid) {
+                	cph_coordid = ((msg_announce_anchor*) rx_buffer)->coordid;
+                	printf("coordinator discovered at %04X\r\n", cph_coordid);
+                }
+
                 // Check for duplicate
 				for (int i=0;i<ANCHORS_MIN;i++) {
 					if (anchors[i].shortid == shortid) {
@@ -285,6 +305,33 @@ void refresh_anchors(void) {
 	printf("Anchors discovered. Moving to poll.  anchors_status:%02X\r\n", anchors_status);
 }
 
+static void send_ranges(int tries) {
+	printf("%d\t%04X\t", tries,cph_coordid);
+	for (int i = 0; i < ANCHORS_MIN; i++) {
+		printf("%04X: %3.2f m\t", anchors[i].shortid, anchors[i].range);
+	}
+	printf("\r\n");
+
+	if (cph_coordid) {
+		// Now send the results
+		tx_range_results_msg.mac_sequence = frame_seq_nb;
+		tx_range_results_msg.mac_dest = cph_coordid;
+		tx_range_results_msg.numranges = ANCHORS_MIN;
+		memcpy(&tx_range_results_msg.ranges[0], &anchors[0], sizeof(anchor_range_t) * ANCHORS_MIN);
+
+		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+		dwt_writetxdata(sizeof(tx_range_results_msg), (uint8_t*) (&tx_range_results_msg), 0);
+		dwt_writetxfctrl(sizeof(tx_range_results_msg), 0);
+		dwt_starttx(DWT_START_TX_IMMEDIATE);
+
+		while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
+		{ };
+
+		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+		frame_seq_nb++;
+	}
+}
+
 void tag_run(void) {
 
 	// Setup DECAWAVE
@@ -309,6 +356,7 @@ void tag_run(void) {
 	tx_discover_msg.mac_source = cph_config->shortid;
 	rx_announce_msg.mac_dest = cph_config->shortid;
 	tx_pair_msg.mac_source = cph_config->shortid;
+	tx_range_results_msg.mac_source = cph_config->shortid;
 
 	// Configure network parameters
 	dwt_setpanid(cph_config->panid);
@@ -359,11 +407,7 @@ void tag_run(void) {
 		}
 
 		if (ranges_countdown) {
-			printf("%d ", ranges_countdown);
-			for (int i = 0; i < ANCHORS_MIN; i++) {
-				printf("%04X: %3.2f m\t", anchors[i].shortid, anchors[i].range);
-			}
-			printf("\r\n");
+			send_ranges(MAX_RANGES_BEFORE_POLL_TIMEOUT - ranges_countdown);
 		}
 		else {
 			printf("ranges_countdown expired!\r\n");
