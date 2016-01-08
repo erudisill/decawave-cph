@@ -226,7 +226,7 @@ void anchor_run(void) {
 		if (cph_coordid) {
 			elapsed = cph_get_millis() - announce_coord_ts;
 			if (elapsed > COORD_ANNOUNCE_INTERVAL) {
-				printf("elapsed %08X\tts %08X\tmillis %08X\r\n", elapsed, announce_coord_ts, cph_get_millis());
+//				printf("elapsed %08X\tts %08X\tmillis %08X\r\n", elapsed, announce_coord_ts, cph_get_millis());
 				announce_coord(1);
 				announce_coord_ts = cph_get_millis();
 			}
@@ -345,7 +345,7 @@ void anchor_run(void) {
 				}
 			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_RANGE_RESULTS) {
 				msg_range_results * results = ((msg_range_results*) rx_buffer);
-				printf("* %04X", cph_coordid);
+				printf("* %04X", results->mac_source);
 				for (int i = 0; i < results->numranges; i++) {
 					printf(" %04X:%3.2f", results->ranges[i].shortid, results->ranges[i].range);
 				}
