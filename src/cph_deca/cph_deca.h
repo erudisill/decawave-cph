@@ -1,0 +1,228 @@
+/*
+ * cph_deca.h
+ *
+ *  Created on: Jan 11, 2016
+ *      Author: ericrudisill
+ */
+
+#ifndef SRC_CPH_DECA_CPH_DECA_H_
+#define SRC_CPH_DECA_CPH_DECA_H_
+
+#include <cph_deca_port.h>
+#include <deca_regs.h>
+#include <deca_device_api.h>
+
+// 								 'C''P'
+#define MAC_PAN_ID				0x4350
+#define MAC_ANCHOR_ID			0x4157
+#define MAC_TAG_ID				0x4556
+#define MAC_FC					0x8841
+#define MAC_FC_ACK				0x8861
+
+#if defined(ANCHOR)
+#define APP_NAME  				"\r\nCPH ANCHOR Version %2X.%02X\r\n"
+#define MAC_ADDRESS				0x4350010000000077
+#define MAC_SHORT				MAC_ANCHOR_ID
+#define app_run					anchor_run
+void anchor_run(void);
+
+#elif defined(TAG)
+#define APP_NAME  				"\r\nCPH TAG Version %2X.%02X\r\n"
+#define MAC_ADDRESS				0x4350010000000078
+#define MAC_SHORT				MAC_TAG_ID
+#define app_run					tag_run
+void tag_run(void);
+
+else
+#error "ANCHOR or TAG must be defined"
+#endif
+
+
+#define DW_CONFIG		\
+		{																													\
+		    2,               /* Channel number. */																			\
+		    DWT_PRF_64M,     /* Pulse repetition frequency. */																\
+		    DWT_PLEN_128,    /* Preamble length. */																			\
+		    DWT_PAC8,        /* Preamble acquisition chunk size. Used in RX only. */										\
+		    9,               /* TX preamble code. Used in TX only. */														\
+		    9,               /* RX preamble code. Used in RX only. */														\
+		    0,               /* Use non-standard SFD (Boolean) */															\
+		    DWT_BR_6M8,      /* Data rate. */																				\
+		    DWT_PHRMODE_STD, /* PHY header mode. */																			\
+		    (129 + 8 - 8)    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */				\
+		}
+
+
+/* Inter-ranging delay period, in milliseconds. */
+#define RNG_DELAY_MS 	5
+
+/* Inter-poll delay period, in milliseconds */
+#define POLL_DELAY_MS 	200
+
+/* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
+#define TX_ANT_DLY 16436
+#define RX_ANT_DLY 16436
+
+/* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
+#define ALL_MSG_COMMON_LEN 10
+
+/* Indexes to access some of the fields in the frames defined above. */
+#define ALL_MSG_SN_IDX 2
+#define RESP_MSG_POLL_RX_TS_IDX 10
+#define RESP_MSG_RESP_TX_TS_IDX 14
+#define RESP_MSG_TS_LEN 4
+
+/* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
+ * 1 uus = 512 / 499.2 µs and 1 µs = 499.2 * 128 dtu. */
+#define UUS_TO_DWT_TIME 65536
+
+/* Delay between frames, in UWB microseconds.  For TAG */
+#define POLL_TX_TO_RESP_RX_DLY_UUS 330
+/* Receive response timeout. See NOTE 5 below. */
+#define RESP_RX_TIMEOUT_UUS 370
+
+/* Delay between frames, in UWB microseconds.  For ANCHOR */
+#define POLL_RX_TO_RESP_TX_DLY_UUS 660
+
+
+/* Speed of light in air, in metres per second. */
+#define SPEED_OF_LIGHT 299702547
+
+
+// Min Number of anchors to range with - if this changes, so should ANCHORS_MASK
+#define ANCHORS_MIN		3
+
+// Used for tracking status of anchor ids (by bitmask) during discovery and poll
+#define ANCHORS_MASK	0x07
+
+// Anchor refresh interval
+#define ANCHORS_REFRESH_INTERVAL	10000
+
+// Coord announce startup burst repeat count
+#define COORD_ANNOUNCE_START_BURST	10
+
+// Coord announce period in ms
+#define COORD_ANNOUNCE_INTERVAL		7000
+
+// Max ranges before poll timeout - keeps from blasting radio when an anchor is not responding
+#define MAX_RANGES_BEFORE_POLL_TIMEOUT	5
+
+// Max number of tags to pair with
+#define MAX_TAGS		32
+
+// Lifetime of tag pairing
+#define PAIR_LIFETIME	5000
+
+// Delay to start listening after discover
+#define DISCOVER_TX_TO_ANNOUNCE_RX_DELAY_UUS	400
+#define DISCOVER_RX_TO_ANNOUNCE_TX_DELAY_UUS	460
+
+enum {
+	CPH_OK = 0,
+	CPH_ERROR,
+	CPH_BAD_FRAME,
+	CPH_BAD_LENGTH,
+	CPH_DUPLICATE
+};
+
+enum {
+	CPH_MODE_ANCHOR = 0x01,
+	CPH_MODE_TAG = 0x02,
+	CPH_MODE_COORD = 0x80
+};
+
+#define	FUNC_RANGE_REQU				0xE0
+#define FUNC_RANGE_RESP				0xE1
+#define FUNC_DISC_ANNO				0xE2
+#define FUNC_DISC_REPLY				0xE3
+#define FUNC_PAIR_RESP				0xE4
+#define FUNC_COORD_ANNO				0xE5
+#define FUNC_RANGE_REPO				0xE6
+
+#define CPH_MAX_MSG_SIZE		64
+
+#define PACKED	__attribute__((packed))
+
+typedef struct PACKED {
+	uint16_t ctl;
+	uint8_t seq;
+	uint16_t panid;
+	uint16_t dest;
+	uint16_t source;
+	uint8_t functionCode;
+} cph_deca_msg_header_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint16_t mac_cs;
+} cph_deca_msg_range_request_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint32_t requestRxTs;
+	uint32_t responseTxTs;
+	uint16_t mac_cs;
+} cph_deca_msg_range_response_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint16_t mac_cs;
+} cph_deca_msg_discover_announce_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint16_t coordid;
+	uint16_t mac_cs;
+} cph_deca_msg_discover_reply_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint16_t mac_cs;
+} cph_deca_msg_pair_response_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint16_t coordid;
+	uint16_t mac_cs;
+} cph_deca_msg_coord_announce_t;
+
+typedef struct PACKED {
+	uint16_t shortid;
+	double range;
+} cph_deca_anchor_range_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint8_t numranges;
+	cph_deca_anchor_range_t ranges[ANCHORS_MIN];		//TODO: Make this dynamic
+	uint16_t mac_fs;
+} cph_deca_msg_range_report_t;
+
+typedef struct PACKED {
+	uint16_t shortid;
+	uint32_t paired_ts;
+} cph_deca_pair_info_t;
+
+
+
+inline uint32_t cph_deca_wait_for_tx_finished(void) {
+	uint32_t status_reg;
+	while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS)) {
+	};
+	return status_reg;
+}
+
+inline uint32_t cph_deca_wait_for_rx_finished(void) {
+	uint32_t status_reg;
+	while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
+	};
+	return status_reg;
+}
+
+
+void cph_deca_load_frame(cph_deca_msg_header_t * hdr, uint16_t size);
+cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer);
+uint32_t cph_deca_send_immediate();
+uint32_t cph_deca_send_delayed();
+
+#endif /* SRC_CPH_DECA_CPH_DECA_H_ */

@@ -17,74 +17,38 @@
 // Default configuration for DW communication
 static dwt_config_t config = DW_CONFIG;
 
-/* Frames used in the ranging process. See NOTE 3 below. */
-static msg_poll rx_poll_msg = {
-MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac_sequence
-		MAC_PAN_ID,		// mac_panid
-		MAC_ANCHOR_ID,	// mac_dest
-		MAC_TAG_ID,		// mac_source
-		FUNC_POLL,		// functionCode
-		0x0000			// mac_cs
-		};
-
-static msg_resp tx_resp_msg = {
-MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac_sequence
-		MAC_PAN_ID,		// mac_panid
-		MAC_TAG_ID,		// mac_dest
-		MAC_ANCHOR_ID,	// mac_source
-		FUNC_RESP,		// functionCode
+static cph_deca_msg_range_response_t tx_range_response_t = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		MAC_TAG_ID,		// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_RANGE_RESP,		// functionCode
 		0x00000000,		// pollRxTs
 		0x00000000,		// respTxTs
 		0x0000			// mac_cs
 		};
 
-static msg_announce_anchor tx_announce_anchor_msg = {
-MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac_sequence
-		MAC_PAN_ID,		// mac_panid
-		MAC_TAG_ID,		// mac_dest
-		MAC_ANCHOR_ID,	// mac_source
-		FUNC_ANNOUNCE_ANCHOR,	// functionCode
+static cph_deca_msg_discover_reply_t tx_discover_reply = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		MAC_TAG_ID,		// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_DISC_REPLY,	// functionCode
 		0x0000,			// coordid
 		0x0000			// mac_cs
 		};
 
-static msg_announce_anchor rx_pair_msg = {
-MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac_sequence
-		MAC_PAN_ID,		// mac_panid
-		MAC_TAG_ID,		// mac_dest
-		MAC_ANCHOR_ID,	// mac_source
-		FUNC_PAIR,		// functionCode
+static cph_deca_msg_coord_announce_t tx_coord_announce = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		0xFFFF,			// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_COORD_ANNO,	// functionCode
 		0x0000			// mac_cs
 		};
-
-static msg_announce_coord tx_announce_coord_msg = {
-MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac_sequence
-		MAC_PAN_ID,		// mac_panid
-		0xFFFF,			// mac_dest
-		MAC_ANCHOR_ID,	// mac_source
-		FUNC_ANNOUNCE_COORD,	// functionCode
-		0x0000			// mac_cs
-		};
-
-static msg_range_results rx_range_results_msg = {
-MAC_FC,			// mac_frameControl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac_sequence
-		MAC_PAN_ID,		// mac_panid
-		MAC_TAG_ID,	// mac_dest
-		MAC_ANCHOR_ID,		// mac_source
-		FUNC_RANGE_RESULTS,		// functionCode
-		0,				// num ranges
-		0,		// results
-		0x0000			// mac_cs
-		};
-
-/* Frame sequence number, incremented after each transmission. */
-static uint8 frame_seq_nb = 0;
 
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
@@ -100,7 +64,7 @@ static uint64 poll_rx_ts;
 static uint64 resp_tx_ts;
 
 /* List of paired tags */
-static pair_info_t paired_tags[MAX_TAGS];
+static cph_deca_pair_info_t paired_tags[MAX_TAGS];
 
 /* Declaration of static functions. */
 static uint64 get_rx_timestamp_u64(void);
@@ -157,19 +121,12 @@ static void announce_coord(int repeat) {
 	TRACE("\r\n");
 
 	// Write announce message to frame buffer
-	tx_announce_coord_msg.mac_sequence = frame_seq_nb;
-	tx_announce_coord_msg.coordid = cph_coordid;
-	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-	dwt_writetxdata(sizeof(tx_announce_coord_msg), (uint8_t*) (&tx_announce_coord_msg), 0);
-	dwt_writetxfctrl(sizeof(tx_announce_coord_msg), 0);
+	tx_coord_announce.coordid = cph_coordid;
+	cph_deca_load_frame(&tx_coord_announce.header, sizeof(tx_coord_announce));
 
 	// Burst out our announcement
 	for (int i = 0; i < repeat; i++) {
-		dwt_starttx(DWT_START_TX_IMMEDIATE);
-		while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS)) {
-		};
-		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-		frame_seq_nb++;
+		cph_deca_send_immediate();
 		deca_sleep(10);
 	}
 }
@@ -178,7 +135,7 @@ void anchor_run(void) {
 	uint32_t announce_coord_ts = 0;
 	uint32_t elapsed = 0;
 
-	memset(paired_tags, 0, sizeof(pair_info_t) * MAX_TAGS);
+	memset(paired_tags, 0, sizeof(cph_deca_pair_info_t) * MAX_TAGS);
 
 	reset_DW1000();
 	spi_set_rate_low();
@@ -200,11 +157,9 @@ void anchor_run(void) {
 	dwt_setaddress16(cph_config->shortid);
 	dwt_enableframefilter(DWT_FF_DATA_EN);
 
-	rx_poll_msg.mac_dest = cph_config->shortid;
-	tx_resp_msg.mac_source = cph_config->shortid;
-	tx_announce_anchor_msg.mac_source = cph_config->shortid;
-	rx_pair_msg.mac_dest = cph_config->shortid;
-	tx_announce_coord_msg.mac_source = cph_config->shortid;
+	tx_range_response_t.header.source = cph_config->shortid;
+	tx_discover_reply.header.source = cph_config->shortid;
+	tx_coord_announce.header.source = cph_config->shortid;
 
 	if (cph_mode & CPH_MODE_COORD) {
 		cph_coordid = cph_config->shortid;
@@ -226,24 +181,16 @@ void anchor_run(void) {
 		/* Activate reception immediately. */
 		dwt_rxenable(0);
 
-		/* Poll for reception of a frame or error/timeout. See NOTE 6 below. */
-		while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
-		};
+		status_reg = cph_deca_wait_for_rx_finished();
 
 		if (status_reg & SYS_STATUS_RXFCG) {
 			uint32 frame_len;
+			cph_deca_msg_header_t * rx_header;
 
-			/* Clear good RX frame event in the DW1000 status register. */
-			dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-
-			/* A frame has been received, read it into the local buffer. */
-			frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-			if (frame_len <= CPH_MAX_MSG_SIZE) {
-				dwt_readrxdata(rx_buffer, frame_len, 0);
-			}
+			rx_header = cph_deca_read_frame(rx_buffer);
 
 			// Look for Poll message
-			if (((msg_poll*) rx_buffer)->functionCode == FUNC_POLL) {
+			if (rx_header->functionCode == FUNC_RANGE_REQU) {
 				uint32 resp_tx_time;
 
 				/* Retrieve poll reception timestamp. */
@@ -257,69 +204,37 @@ void anchor_run(void) {
 				resp_tx_ts = (((uint64) (resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
 
 				/* Write all timestamps in the final message. See NOTE 8 below. */
-				tx_resp_msg.pollRxTs = poll_rx_ts;
-				tx_resp_msg.respTxTs = resp_tx_ts;
+				tx_range_response_t.requestRxTs = poll_rx_ts;
+				tx_range_response_t.responseTxTs = resp_tx_ts;
 
-				/* Write and send the response message. See NOTE 9 below. */
-				tx_resp_msg.mac_sequence = 0;
-				tx_resp_msg.mac_dest = ((msg_poll*) rx_buffer)->mac_source;
-				dwt_writetxdata(sizeof(tx_resp_msg), (uint8_t*) &tx_resp_msg, 0);
-				dwt_writetxfctrl(sizeof(tx_resp_msg), 0);
-				int result = dwt_starttx(DWT_START_TX_DELAYED);
-				uint32_t ts = dwt_readsystimestamphi32();
+				/* Send the response message */
+				tx_range_response_t.header.dest = rx_header->source;
+				cph_deca_load_frame(&tx_range_response_t.header, sizeof(tx_range_response_t));
+				cph_deca_send_delayed();
 
-				if (result == DWT_SUCCESS) {
-					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
-					while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS)) {
-					};
-					//TRACE("SUCCESS: dwt_startx response sent %d .. status_reg:%08X\r\n", frame_seq_nb, status_reg);
-				} else {
-					TRACE("ERROR: dwt_starttx response returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result,
-							resp_tx_time, ts);
-				}
+			} else if (rx_header->functionCode == FUNC_DISC_ANNO) {
 
-				/* Clear TXFRS event. */
-				dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-				/* Increment frame sequence number after transmission of the poll message (modulo 256). */
-				frame_seq_nb++;
-			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_DISCOVER) {
-
-				if (can_respond_to_discover(((msg_poll*) rx_buffer)->mac_source)) {
+				if (can_respond_to_discover(rx_header->source)) {
 					/* Write and send the announce message. */
-					tx_announce_anchor_msg.mac_sequence = 0;
-					tx_announce_anchor_msg.coordid = cph_coordid;
-					tx_announce_anchor_msg.mac_dest = ((msg_poll*) rx_buffer)->mac_source;
-					dwt_writetxdata(sizeof(tx_announce_anchor_msg), (uint8_t*) &tx_announce_anchor_msg, 0);
-					dwt_writetxfctrl(sizeof(tx_announce_anchor_msg), 0);
-					int result = dwt_starttx(DWT_START_TX_IMMEDIATE);
-
-					if (result == DWT_SUCCESS) {
-						/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
-						while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS)) {
-						};
-					} else {
-						TRACE("ERROR: dwt_starttx announce returned %d\r\n");
-					}
-
-					/* Clear TXFRS event. */
-					dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-
-					/* Increment frame sequence number after transmission of the poll message (modulo 256). */
-					frame_seq_nb++;
+					tx_discover_reply.coordid = cph_coordid;
+					tx_discover_reply.header.dest = rx_header->source;
+					cph_deca_load_frame(&tx_discover_reply.header, sizeof(tx_discover_reply));
+					cph_deca_send_immediate();
 				} else {
-					TRACE("ignoring pair with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
+					TRACE("ignoring pair with %04X\r\n", (rx_header->source));
 				}
-			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_PAIR) {
+
+			} else if (rx_header->functionCode == FUNC_PAIR_RESP) {
 				//TODO: Record the pairing details and check them when receiving a discover request
 				//      For now, nothing to do
-				if (update_paired_tags(((msg_poll*) rx_buffer)->mac_source)) {
-					TRACE("paired with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
+				if (update_paired_tags(rx_header->source)) {
+					TRACE("paired with %04X\r\n", (rx_header->source));
 				} else {
-					TRACE("failed to pair with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
+					TRACE("failed to pair with %04X\r\n", (rx_header->source));
 				}
-			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_ANNOUNCE_COORD) {
-				uint16_t id = ((msg_announce_coord*) rx_buffer)->coordid;
+
+			} else if (rx_header->functionCode == FUNC_COORD_ANNO) {
+				uint16_t id = ((cph_deca_msg_coord_announce_t*) rx_buffer)->coordid;
 				if (id != cph_coordid) {
 					cph_coordid = id;
 					if (cph_coordid == cph_config->shortid) {
@@ -334,9 +249,10 @@ void anchor_run(void) {
 						cph_mode &= (~CPH_MODE_COORD);
 					}
 				}
-			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_RANGE_RESULTS) {
-				msg_range_results * results = ((msg_range_results*) rx_buffer);
-				TRACE("* %04X", results->mac_source);
+
+			} else if (rx_header->functionCode == FUNC_RANGE_REPO) {
+				cph_deca_msg_range_report_t * results = ((cph_deca_msg_range_report_t*) rx_buffer);
+				TRACE("* %04X", rx_header->source);
 				for (int i = 0; i < results->numranges; i++) {
 					TRACE(" %04X:%3.2f", results->ranges[i].shortid, results->ranges[i].range);
 				}
@@ -349,6 +265,7 @@ void anchor_run(void) {
 				TRACE("\r\n");
 			}
 		} else {
+
 			// Ignore frame rejections and timeouts
 			uint32_t test = status_reg & (~(SYS_STATUS_AFFREJ | SYS_STATUS_RXRFTO));
 			if (test & SYS_STATUS_ALL_RX_ERR) {
