@@ -33,7 +33,7 @@
 #define MAC_FC_ACK				0x8861
 
 #ifdef ANCHOR
-#define APP_NAME  				"CPH ANCHOR Version %2X.%02X\r\n"
+#define APP_NAME  				"\r\nCPH ANCHOR Version %2X.%02X\r\n"
 #define MAC_ADDRESS				0x4350010000000077
 #define MAC_SHORT				MAC_ANCHOR_ID
 #define app_run					anchor_run
@@ -149,6 +149,8 @@ enum {
 #define FUNC_PAIR				0xE4
 #define FUNC_ANNOUNCE_COORD		0xE5
 #define FUNC_RANGE_RESULTS		0xE6
+
+#define CPH_MAX_MSG_SIZE		64
 
 #define PACKED	__attribute__((packed))
 

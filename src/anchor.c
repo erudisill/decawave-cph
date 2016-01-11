@@ -88,8 +88,7 @@ static uint8 frame_seq_nb = 0;
 
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 12
-static uint8 rx_buffer[RX_BUF_LEN];
+static uint8 rx_buffer[CPH_MAX_MSG_SIZE];
 
 /* Hold copy of status register state here for reference, so reader can examine it at a breakpoint. */
 static uint32 status_reg = 0;
@@ -151,11 +150,11 @@ static bool update_paired_tags(uint16_t shortid) {
 
 static void announce_coord(int repeat) {
 
-	printf("announcing coordinator %04X", cph_coordid);
+	TRACE("announcing coordinator %04X", cph_coordid);
 	if (cph_coordid == cph_config->shortid) {
-		printf(" (me)");
+		TRACE(" (me)");
 	}
-	printf("\r\n");
+	TRACE("\r\n");
 
 	// Write announce message to frame buffer
 	tx_announce_coord_msg.mac_sequence = frame_seq_nb;
@@ -191,8 +190,6 @@ void anchor_run(void) {
 	dwt_setrxantennadelay(RX_ANT_DLY);
 	dwt_settxantennadelay(TX_ANT_DLY);
 
-	//dwt_setrxtimeout(0xFFFF);
-
 	if (cph_config->shortid == 0) {
 		cph_config->shortid = cph_utils_get_shortid_candidate();
 		cph_config_write();
@@ -202,10 +199,6 @@ void anchor_run(void) {
 	dwt_setpanid(cph_config->panid);
 	dwt_setaddress16(cph_config->shortid);
 	dwt_enableframefilter(DWT_FF_DATA_EN);
-
-//    // Disable interrupt on frame rejection
-//    dwt_setinterrupt(DWT_INT_ARFE, 0);
-//    dwt_setautorxreenable(1);
 
 	rx_poll_msg.mac_dest = cph_config->shortid;
 	tx_resp_msg.mac_source = cph_config->shortid;
@@ -221,12 +214,10 @@ void anchor_run(void) {
 
 	/* Loop forever responding to ranging requests. */
 	while (1) {
-		//print_status(frame_seq_nb);
 
 		if (cph_coordid) {
 			elapsed = cph_get_millis() - announce_coord_ts;
 			if (elapsed > COORD_ANNOUNCE_INTERVAL) {
-//				printf("elapsed %08X\tts %08X\tmillis %08X\r\n", elapsed, announce_coord_ts, cph_get_millis());
 				announce_coord(1);
 				announce_coord_ts = cph_get_millis();
 			}
@@ -247,7 +238,7 @@ void anchor_run(void) {
 
 			/* A frame has been received, read it into the local buffer. */
 			frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
-			if (frame_len <= RX_BUFFER_LEN) {
+			if (frame_len <= CPH_MAX_MSG_SIZE) {
 				dwt_readrxdata(rx_buffer, frame_len, 0);
 			}
 
@@ -281,9 +272,9 @@ void anchor_run(void) {
 					/* Poll DW1000 until TX frame sent event set. See NOTE 6 below. */
 					while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS)) {
 					};
-					//printf("SUCCESS: dwt_startx response sent %d .. status_reg:%08X\r\n", frame_seq_nb, status_reg);
+					//TRACE("SUCCESS: dwt_startx response sent %d .. status_reg:%08X\r\n", frame_seq_nb, status_reg);
 				} else {
-					printf("ERROR: dwt_starttx response returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result,
+					TRACE("ERROR: dwt_starttx response returned %d  .. resp_tx_time:%08X   systime:%08X\r\n", result,
 							resp_tx_time, ts);
 				}
 
@@ -308,7 +299,7 @@ void anchor_run(void) {
 						while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS)) {
 						};
 					} else {
-						printf("ERROR: dwt_starttx announce returned %d\r\n");
+						TRACE("ERROR: dwt_starttx announce returned %d\r\n");
 					}
 
 					/* Clear TXFRS event. */
@@ -317,51 +308,51 @@ void anchor_run(void) {
 					/* Increment frame sequence number after transmission of the poll message (modulo 256). */
 					frame_seq_nb++;
 				} else {
-					printf("ignoring pair with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
+					TRACE("ignoring pair with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
 				}
 			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_PAIR) {
 				//TODO: Record the pairing details and check them when receiving a discover request
 				//      For now, nothing to do
 				if (update_paired_tags(((msg_poll*) rx_buffer)->mac_source)) {
-					printf("paired with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
+					TRACE("paired with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
 				} else {
-					printf("failed to pair with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
+					TRACE("failed to pair with %04X\r\n", ((msg_poll*) rx_buffer)->mac_source);
 				}
 			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_ANNOUNCE_COORD) {
 				uint16_t id = ((msg_announce_coord*) rx_buffer)->coordid;
 				if (id != cph_coordid) {
 					cph_coordid = id;
 					if (cph_coordid == cph_config->shortid) {
-						printf("becoming coord\r\n");
+						TRACE("becoming coord\r\n");
 						cph_mode |= CPH_MODE_COORD;
 					} else {
 						if (cph_mode & CPH_MODE_COORD) {
-							printf("giving coord to %04X\r\n", cph_coordid);
+							TRACE("giving coord to %04X\r\n", cph_coordid);
 						} else {
-							printf("recognizing coord as %04X\r\n", cph_coordid);
+							TRACE("recognizing coord as %04X\r\n", cph_coordid);
 						}
 						cph_mode &= (~CPH_MODE_COORD);
 					}
 				}
 			} else if (((msg_poll*) rx_buffer)->functionCode == FUNC_RANGE_RESULTS) {
 				msg_range_results * results = ((msg_range_results*) rx_buffer);
-				printf("* %04X", results->mac_source);
+				TRACE("* %04X", results->mac_source);
 				for (int i = 0; i < results->numranges; i++) {
-					printf(" %04X:%3.2f", results->ranges[i].shortid, results->ranges[i].range);
+					TRACE(" %04X:%3.2f", results->ranges[i].shortid, results->ranges[i].range);
 				}
-				printf("\r\n");
+				TRACE("\r\n");
 
 			} else {
-				printf("ERROR: unknown function code - data: ");
+				TRACE("ERROR: unknown function code - data: ");
 				for (int i = 0; i < frame_len; i++)
-					printf("%02X ", rx_buffer[i]);
-				printf("\r\n");
+					TRACE("%02X ", rx_buffer[i]);
+				TRACE("\r\n");
 			}
 		} else {
 			// Ignore frame rejections and timeouts
 			uint32_t test = status_reg & (~(SYS_STATUS_AFFREJ | SYS_STATUS_RXRFTO));
 			if (test & SYS_STATUS_ALL_RX_ERR) {
-				printf("ERROR: dwt_rxenable has status of %08X\r\n", status_reg);
+				TRACE("ERROR: dwt_rxenable has status of %08X\r\n", status_reg);
 				/* Clear RX error events in the DW1000 status register. */
 				dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
 			}
