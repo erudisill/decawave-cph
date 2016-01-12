@@ -108,6 +108,13 @@ int main(void) {
 	// Get configuration page from NVM
 	init_config();
 
+	// Generate short id if we don't have one
+	if (cph_config->shortid == 0) {
+		cph_config->shortid = cph_utils_get_shortid_candidate();
+		cph_config_write();
+		TRACE("Generated candidate shortid 0x%04X\r\n", cph_config->shortid);
+	}
+
     // Start with board specific hardware init.
 	cph_deca_init_gpio();
 	cph_deca_spi_init();

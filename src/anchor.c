@@ -14,8 +14,6 @@
 #include <deca_regs.h>
 #include <deca_sleep.h>
 
-// Default configuration for DW communication
-static dwt_config_t config = DW_CONFIG;
 
 static cph_deca_msg_range_response_t tx_range_response_t = {
 		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
@@ -135,32 +133,19 @@ void anchor_run(void) {
 	uint32_t announce_coord_ts = 0;
 	uint32_t elapsed = 0;
 
+	// Setup DW1000
+	cph_deca_init_device();
+	cph_deca_init_network(cph_config->panid, cph_config->shortid);
+
+	// Init list of paired tags
 	memset(paired_tags, 0, sizeof(cph_deca_pair_info_t) * MAX_TAGS);
 
-	reset_DW1000();
-	spi_set_rate_low();
-	dwt_initialise(DWT_LOADUCODE);
-	spi_set_rate_high();
-
-	dwt_configure(&config);
-
-	dwt_setrxantennadelay(RX_ANT_DLY);
-	dwt_settxantennadelay(TX_ANT_DLY);
-
-	if (cph_config->shortid == 0) {
-		cph_config->shortid = cph_utils_get_shortid_candidate();
-		cph_config_write();
-		TRACE("Generated candidate shortid 0x%04X\r\n", cph_config->shortid);
-	}
-
-	dwt_setpanid(cph_config->panid);
-	dwt_setaddress16(cph_config->shortid);
-	dwt_enableframefilter(DWT_FF_DATA_EN);
-
+	// Set our shortid in common messages
 	tx_range_response_t.header.source = cph_config->shortid;
 	tx_discover_reply.header.source = cph_config->shortid;
 	tx_coord_announce.header.source = cph_config->shortid;
 
+	// Announce ourselves if we're the coordinator
 	if (cph_mode & CPH_MODE_COORD) {
 		cph_coordid = cph_config->shortid;
 		cph_mode |= CPH_MODE_COORD;

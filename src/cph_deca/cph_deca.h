@@ -225,5 +225,6 @@ cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame
 uint32_t cph_deca_send_immediate();
 uint32_t cph_deca_send_delayed();
 uint32_t cph_deca_send_response_expected();
-
+void cph_deca_init_device();
+void cph_deca_init_network(uint16_t panid, uint16_t shortid);
 #endif /* SRC_CPH_DECA_CPH_DECA_H_ */

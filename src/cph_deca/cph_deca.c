@@ -10,6 +10,10 @@
 
 static uint8 frame_seq_nb = 0;
 
+// Default configuration for DW communication
+static dwt_config_t config = DW_CONFIG;
+
+
 void cph_deca_load_frame(cph_deca_msg_header_t * hdr, uint16_t size) {
 	// Write message to frame buffer
 	hdr->seq = frame_seq_nb;
@@ -70,4 +74,24 @@ cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame
 		return 0;
 	}
 
+}
+
+void cph_deca_init_device() {
+	// Setup DECAWAVE
+	reset_DW1000();
+	spi_set_rate_low();
+	dwt_initialise(DWT_LOADUCODE);
+	spi_set_rate_high();
+
+	dwt_configure(&config);
+
+	dwt_setrxantennadelay(RX_ANT_DLY);
+	dwt_settxantennadelay(TX_ANT_DLY);
+}
+
+void cph_deca_init_network(uint16_t panid, uint16_t shortid) {
+	// Configure network parameters
+	dwt_setpanid(panid);
+	dwt_setaddress16(shortid);
+	dwt_enableframefilter(DWT_FF_DATA_EN);
 }

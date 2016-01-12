@@ -14,9 +14,6 @@
 #include <deca_regs.h>
 #include <deca_sleep.h>
 
-// Default configuration for DW communication
-static dwt_config_t config = DW_CONFIG;
-
 #define ANCHOR_ID		0x616A
 
 /* Frames used in the ranging process.  */
@@ -257,33 +254,14 @@ static void send_ranges(int tries) {
 void tag_run(void) {
 
 	// Setup DECAWAVE
-	reset_DW1000();
-	spi_set_rate_low();
-	dwt_initialise(DWT_LOADUCODE);
-	spi_set_rate_high();
+	cph_deca_init_device();
+	cph_deca_init_network(cph_config->panid, cph_config->shortid);
 
-	dwt_configure(&config);
-
-	dwt_setrxantennadelay(RX_ANT_DLY);
-	dwt_settxantennadelay(TX_ANT_DLY);
-
-	// Determine short id
-	if (cph_config->shortid == 0) {
-		cph_config->shortid = cph_utils_get_shortid_candidate();
-		cph_config_write();
-		TRACE("Generated candidate shortid 0x%04X\r\n", cph_config->shortid);
-	}
-
+	// Set our short id in common messages
 	tx_poll_msg.header.source = cph_config->shortid;
 	tx_discover_msg.header.source = cph_config->shortid;
 	tx_pair_msg.header.source = cph_config->shortid;
 	tx_range_results_msg.header.source = cph_config->shortid;
-
-	// Configure network parameters
-	dwt_setpanid(cph_config->panid);
-	dwt_setaddress16(cph_config->shortid);
-	dwt_enableframefilter(DWT_FF_DATA_EN);
-
 
 	// First, discover anchors
 	uint32_t anchor_refresh_ts = 0;
