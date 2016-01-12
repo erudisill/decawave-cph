@@ -1,6 +1,6 @@
 /*
- * tag.c
  *
+ * tag.c
  *  Created on: Dec 9, 2015
  *      Author: ericrudisill
  */
@@ -68,13 +68,9 @@ MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short
 static cph_deca_anchor_range_t anchors[ANCHORS_MIN];
 static unsigned int anchors_status;
 
-/* Frame sequence number, incremented after each transmission. */
-static uint8 frame_seq_nb = 0;
-
 /* Buffer to store received response message.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
-#define RX_BUF_LEN 20
-static uint8 rx_buffer[RX_BUF_LEN];
+static uint8 rx_buffer[CPH_MAX_MSG_SIZE];
 
 /* Hold copy of status register state here for reference, so reader can examine it at a breakpoint. */
 static uint32 status_reg = 0;
@@ -90,36 +86,17 @@ static int range(uint16_t destid, double * dist) {
 
 	// Setup POLL frame to request to range with anchor
 	tx_poll_msg.header.dest = destid;
-	tx_poll_msg.header.seq = frame_seq_nb;
-	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-	dwt_writetxdata(sizeof(tx_poll_msg), (uint8_t*) (&tx_poll_msg), 0);
-	dwt_writetxfctrl(sizeof(tx_poll_msg), 0);
 
-	// Start transmission, indicating that a response is expected so that reception is enabled automatically
-	// after the frame is sent and the delay set by dwt_setrxaftertxdelay() has elapsed.
-	dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-
-	// We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout.
-	while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
-	};
-
-	// Increment frame sequence number after transmission of the poll message (modulo 256).
-	frame_seq_nb++;
+	cph_deca_load_frame((cph_deca_msg_header_t*)&tx_poll_msg, sizeof(tx_poll_msg));
+	status_reg = cph_deca_send_response_expected();
 
 	if (status_reg & SYS_STATUS_RXFCG) {
 		uint32 frame_len;
 		cph_deca_msg_header_t * rx_header;
 
-		// Clear good RX frame event in the DW1000 status register.
-		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-
 		// A frame has been received, read it into the local buffer.
-		frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-		if (frame_len <= RX_BUF_LEN) {
-			dwt_readrxdata(rx_buffer, frame_len, 0);
-
-			rx_header = (cph_deca_msg_header_t*)rx_buffer;
-
+		rx_header = cph_deca_read_frame(rx_buffer, &frame_len);
+		if (rx_header) {
 			// If valid response, calculate distance
 			if (rx_header->functionCode == 0xE1) {
 				uint32 poll_tx_ts, resp_rx_ts, poll_rx_ts, resp_tx_ts;
@@ -130,8 +107,8 @@ static int range(uint16_t destid, double * dist) {
 				resp_rx_ts = dwt_readrxtimestamplo32();
 
 				// Get timestamps embedded in response message.
-				poll_rx_ts = ((cph_deca_msg_range_response_t*) (rx_buffer))->requestRxTs;
-				resp_tx_ts = ((cph_deca_msg_range_response_t*) (rx_buffer))->responseTxTs;
+				poll_rx_ts = ((cph_deca_msg_range_response_t*) (rx_header))->requestRxTs;
+				resp_tx_ts = ((cph_deca_msg_range_response_t*) (rx_header))->responseTxTs;
 
 				// Compute time of flight and distance.
 				rtd_init = resp_rx_ts - poll_tx_ts;
@@ -146,7 +123,6 @@ static int range(uint16_t destid, double * dist) {
 			result = CPH_BAD_LENGTH;
 		}
 	} else {
-//		printf("STATUS: %08X\r\n", status_reg);
 		// Clear RX error events in the DW1000 status register.
 		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
 		result = CPH_ERROR;
@@ -161,53 +137,26 @@ static int discover(int idx) {
 	dwt_setrxaftertxdelay(0);
 	dwt_setrxtimeout(600);
 
-	// Setup POLL frame to request to range with anchor
-	tx_discover_msg.header.seq = frame_seq_nb;
-	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-	dwt_writetxdata(sizeof(tx_discover_msg), (uint8_t*) (&tx_discover_msg), 0);
-	dwt_writetxfctrl(sizeof(tx_discover_msg), 0);
-
-	// Start transmission, indicating that a response is expected so that reception is enabled automatically
-	// after the frame is sent and the delay set by dwt_setrxaftertxdelay() has elapsed.
-	dwt_starttx(DWT_START_TX_IMMEDIATE | DWT_RESPONSE_EXPECTED);
-
-	// We assume that the transmission is achieved correctly, poll for reception of a frame or error/timeout.
-	while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
-	};
-
-	// Increment frame sequence number after transmission of the poll message (modulo 256).
-	frame_seq_nb++;
+	// Broadcast anchor discovery request
+	cph_deca_load_frame((cph_deca_msg_header_t*)&tx_discover_msg, sizeof(tx_discover_msg));
+	status_reg = cph_deca_send_response_expected();
 
 	if (status_reg & SYS_STATUS_RXFCG) {
 		uint32 frame_len;
 		cph_deca_msg_header_t * rx_header;
 
-		// Clear good RX frame event in the DW1000 status register.
-		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_RXFCG);
-
 		// A frame has been received, read it into the local buffer.
-		frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFLEN_MASK;
-		if (frame_len <= sizeof(cph_deca_msg_discover_reply_t)) {
-			dwt_readrxdata(rx_buffer, frame_len, 0);
-
-			rx_header = (cph_deca_msg_header_t*)rx_buffer;
-
+		rx_header = cph_deca_read_frame(rx_buffer, &frame_len);
+		if (rx_header) {
 			// If valid response, send the reply
 			if (rx_header->functionCode == FUNC_DISC_REPLY) {
 
 				uint16_t shortid = rx_header->source;
 
 				// Now send the pair response back
-				tx_pair_msg.header.seq = frame_seq_nb;
 				tx_pair_msg.header.dest = shortid;
-				dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-				dwt_writetxdata(sizeof(tx_pair_msg), (uint8_t*) (&tx_pair_msg), 0);
-				dwt_writetxfctrl(sizeof(tx_pair_msg), 0);
-				dwt_starttx(DWT_START_TX_IMMEDIATE);
-				while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
-				{ };
-                dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-                frame_seq_nb++;
+				cph_deca_load_frame((cph_deca_msg_header_t*)&tx_pair_msg, sizeof(tx_pair_msg));
+				cph_deca_send_immediate();
 
                 // Grab the coordinator id
                 if (((cph_deca_msg_discover_reply_t*) rx_buffer)->coordid != cph_coordid) {
@@ -296,21 +245,12 @@ static void send_ranges(int tries) {
 
 	if (cph_coordid) {
 		// Now send the results
-		tx_range_results_msg.header.seq = frame_seq_nb;
 		tx_range_results_msg.header.dest = cph_coordid;
 		tx_range_results_msg.numranges = ANCHORS_MIN;
 		memcpy(&tx_range_results_msg.ranges[0], &anchors[0], sizeof(cph_deca_anchor_range_t) * ANCHORS_MIN);
 
-		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-		dwt_writetxdata(sizeof(tx_range_results_msg), (uint8_t*) (&tx_range_results_msg), 0);
-		dwt_writetxfctrl(sizeof(tx_range_results_msg), 0);
-		dwt_starttx(DWT_START_TX_IMMEDIATE);
-
-		while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & SYS_STATUS_TXFRS))
-		{ };
-
-		dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
-		frame_seq_nb++;
+		cph_deca_load_frame((cph_deca_msg_header_t*)&tx_range_results_msg, sizeof(tx_range_results_msg));
+		cph_deca_send_immediate();
 	}
 }
 

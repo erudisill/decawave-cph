@@ -187,7 +187,7 @@ void anchor_run(void) {
 			uint32 frame_len;
 			cph_deca_msg_header_t * rx_header;
 
-			rx_header = cph_deca_read_frame(rx_buffer);
+			rx_header = cph_deca_read_frame(rx_buffer, &frame_len);
 
 			// Look for Poll message
 			if (rx_header->functionCode == FUNC_RANGE_REQU) {

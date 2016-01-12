@@ -33,7 +33,7 @@ void anchor_run(void);
 #define app_run					tag_run
 void tag_run(void);
 
-else
+#else
 #error "ANCHOR or TAG must be defined"
 #endif
 
@@ -221,8 +221,9 @@ inline uint32_t cph_deca_wait_for_rx_finished(void) {
 
 
 void cph_deca_load_frame(cph_deca_msg_header_t * hdr, uint16_t size);
-cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer);
+cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame_len);
 uint32_t cph_deca_send_immediate();
 uint32_t cph_deca_send_delayed();
+uint32_t cph_deca_send_response_expected();
 
 #endif /* SRC_CPH_DECA_CPH_DECA_H_ */
