@@ -40,7 +40,7 @@ uint32_t cph_deca_send_delayed() {
 	if (result == DWT_SUCCESS) {
 		status_reg = cph_deca_wait_for_tx_finished();
 	} else {
-		TRACE("ERROR: dwt_starttx response returned %d\r\n", result);
+		TRACE("ERROR: dwt_starttx response returned %d - too late!\r\n", result);
 	}
 	dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
 	frame_seq_nb++;
@@ -77,6 +77,8 @@ cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame
 }
 
 void cph_deca_init_device() {
+	dwt_txconfig_t txconfig;
+
 	// Setup DECAWAVE
 	reset_DW1000();
 	spi_set_rate_low();
@@ -84,6 +86,11 @@ void cph_deca_init_device() {
 	spi_set_rate_high();
 
 	dwt_configure(&config);
+
+	txconfig.PGdly = 0xC2;			// for channel 2
+	txconfig.power = 0x07274767;	// smart power, channel 2, 64MHz
+	dwt_setsmarttxpower(1);
+	dwt_configuretxrf(&txconfig);
 
 	dwt_setrxantennadelay(RX_ANT_DLY);
 	dwt_settxantennadelay(TX_ANT_DLY);

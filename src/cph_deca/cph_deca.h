@@ -60,29 +60,37 @@ void tag_run(void);
 #define POLL_DELAY_MS 	200
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
-#define TX_ANT_DLY 16436
-#define RX_ANT_DLY 16436
+//#define TX_ANT_DLY 16436
+//#define RX_ANT_DLY 16436
 
-/* Length of the common part of the message (up to and including the function code, see NOTE 3 below). */
-#define ALL_MSG_COMMON_LEN 10
+////////////ADJUSTED
+//#define TX_ANT_DLY 16486
+//#define RX_ANT_DLY 16486
 
-/* Indexes to access some of the fields in the frames defined above. */
-#define ALL_MSG_SN_IDX 2
-#define RESP_MSG_POLL_RX_TS_IDX 10
-#define RESP_MSG_RESP_TX_TS_IDX 14
-#define RESP_MSG_TS_LEN 4
+#define TX_ANT_DLY 0
+#define RX_ANT_DLY (16486 * 2)
+
 
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
  * 1 uus = 512 / 499.2 µs and 1 µs = 499.2 * 128 dtu. */
 #define UUS_TO_DWT_TIME 65536
 
+
+///* Delay between frames, in UWB microseconds.  For TAG */
+//#define POLL_TX_TO_RESP_RX_DLY_UUS 330
+///* Receive response timeout. See NOTE 5 below. */
+//#define RESP_RX_TIMEOUT_UUS 370
+
 /* Delay between frames, in UWB microseconds.  For TAG */
-#define POLL_TX_TO_RESP_RX_DLY_UUS 330
+#define POLL_TX_TO_RESP_RX_DLY_UUS 100
 /* Receive response timeout. See NOTE 5 below. */
-#define RESP_RX_TIMEOUT_UUS 370
+#define RESP_RX_TIMEOUT_UUS 900
+
+
 
 /* Delay between frames, in UWB microseconds.  For ANCHOR */
-#define POLL_RX_TO_RESP_TX_DLY_UUS 660
+//#define POLL_RX_TO_RESP_TX_DLY_UUS 660
+#define POLL_RX_TO_RESP_TX_DLY_UUS 550
 
 
 /* Speed of light in air, in metres per second. */
@@ -90,10 +98,12 @@ void tag_run(void);
 
 
 // Min Number of anchors to range with - if this changes, so should ANCHORS_MASK
-#define ANCHORS_MIN		3
+//#define ANCHORS_MIN		3
+#define ANCHORS_MIN		1
 
 // Used for tracking status of anchor ids (by bitmask) during discovery and poll
-#define ANCHORS_MASK	0x07
+//#define ANCHORS_MASK	0x07
+#define ANCHORS_MASK	0x01
 
 // Anchor refresh interval
 #define ANCHORS_REFRESH_INTERVAL	10000
@@ -112,6 +122,9 @@ void tag_run(void);
 
 // Lifetime of tag pairing
 #define PAIR_LIFETIME	5000
+
+// Number of samples to average over
+#define RANGE_SAMPLES_AVG	8.0
 
 // Delay to start listening after discover
 #define DISCOVER_TX_TO_ANNOUNCE_RX_DELAY_UUS	400
@@ -189,6 +202,7 @@ typedef struct PACKED {
 typedef struct PACKED {
 	uint16_t shortid;
 	double range;
+	double range_avg;
 } cph_deca_anchor_range_t;
 
 typedef struct PACKED {

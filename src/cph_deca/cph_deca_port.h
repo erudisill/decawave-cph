@@ -39,7 +39,8 @@ void cph_deca_reset(void);
 #define decamutexon				cph_deca_isr_mutex_on
 
 #define spi_set_rate_low()		cph_deca_spi_set_baud(1000000)
-#define spi_set_rate_high()		cph_deca_spi_set_baud(8000000)
+//#define spi_set_rate_high()		cph_deca_spi_set_baud(8000000)
+#define spi_set_rate_high()		cph_deca_spi_set_baud(10000000)
 
 //#define Sleep(n)				cph_millis_delay(n)
 

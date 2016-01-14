@@ -75,14 +75,14 @@ static uint32 status_reg = 0;
 /* Hold copies of computed time of flight and distance here for reference, so reader can examine it at a breakpoint. */
 static double tof;
 
-static int range(uint16_t destid, double * dist) {
+static int range(cph_deca_anchor_range_t * range) {
 	int result = CPH_OK;
 
 	dwt_setrxaftertxdelay(POLL_TX_TO_RESP_RX_DLY_UUS);
 	dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS);
 
 	// Setup POLL frame to request to range with anchor
-	tx_poll_msg.header.dest = destid;
+	tx_poll_msg.header.dest = range->shortid;
 
 	cph_deca_load_frame((cph_deca_msg_header_t*)&tx_poll_msg, sizeof(tx_poll_msg));
 	status_reg = cph_deca_send_response_expected();
@@ -112,7 +112,10 @@ static int range(uint16_t destid, double * dist) {
 				rtd_resp = resp_tx_ts - poll_rx_ts;
 
 				tof = ((rtd_init - rtd_resp) / 2.0) * DWT_TIME_UNITS;
-				*dist = tof * SPEED_OF_LIGHT;
+				range->range = tof * SPEED_OF_LIGHT;
+
+				range->range_avg -= (range->range_avg / RANGE_SAMPLES_AVG);
+				range->range_avg += (range->range / RANGE_SAMPLES_AVG);
 			} else {
 				result = CPH_BAD_FRAME;
 			}
@@ -236,7 +239,7 @@ void refresh_anchors(void) {
 static void send_ranges(int tries) {
 	printf("%d\t%04X\t", tries,cph_coordid);
 	for (int i = 0; i < ANCHORS_MIN; i++) {
-		printf("%04X: %3.2f m\t", anchors[i].shortid, anchors[i].range);
+		printf("%04X: %3.2f m (%3.2f m)\t", anchors[i].shortid, anchors[i].range, anchors[i].range_avg);
 	}
 	printf("\r\n");
 
@@ -290,7 +293,7 @@ void tag_run(void) {
 			for (int i = 0; i < ANCHORS_MIN; i++) {
 				if (anchors_status & (1 << i)) {
 					anchors[i].range = 0;
-					int result = range(anchors[i].shortid, &anchors[i].range);
+					int result = range(&anchors[i]);
 
 					if (result == CPH_OK) {
 						anchors_status &= (~(1 << i));
