@@ -31,7 +31,9 @@ void anchor_run(void);
 #define MAC_ADDRESS				0x4350010000000078
 #define MAC_SHORT				MAC_TAG_ID
 #define app_run					tag_run
+//#define app_run					tag_burst_run
 void tag_run(void);
+void tag_burst_run(void);
 
 #else
 #error "ANCHOR or TAG must be defined"
@@ -53,6 +55,21 @@ void tag_run(void);
 		}
 
 
+//// Mode 3 from EVK
+//#define DW_CONFIG		\
+//		{																													\
+//		    2,               /* Channel number. */																			\
+//			DWT_PRF_64M,     /* Pulse repetition frequency. */																\
+//			DWT_PLEN_1024,    /* Preamble length. */																			\
+//			DWT_PAC32,        /* Preamble acquisition chunk size. Used in RX only. */										\
+//		    9,               /* TX preamble code. Used in TX only. */														\
+//		    9,               /* RX preamble code. Used in RX only. */														\
+//		    1,               /* Use non-standard SFD (Boolean) */															\
+//			DWT_BR_110K,      /* Data rate. */																				\
+//		    DWT_PHRMODE_STD, /* PHY header mode. */																			\
+//			(1025 + 64 - 32)    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */				\
+//		}
+
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 	5
 
@@ -60,15 +77,15 @@ void tag_run(void);
 #define POLL_DELAY_MS 	200
 
 /* Default antenna delay values for 64 MHz PRF. See NOTE 2 below. */
-//#define TX_ANT_DLY 16436
-//#define RX_ANT_DLY 16436
+#define TX_ANT_DLY 16436
+#define RX_ANT_DLY 16436
 
 ////////////ADJUSTED
 //#define TX_ANT_DLY 16486
 //#define RX_ANT_DLY 16486
 
-#define TX_ANT_DLY 0
-#define RX_ANT_DLY (16486 * 2)
+//#define TX_ANT_DLY 0
+//#define RX_ANT_DLY (16486 * 2)
 
 
 /* UWB microsecond (uus) to device time unit (dtu, around 15.65 ps) conversion factor.
@@ -123,9 +140,6 @@ void tag_run(void);
 // Lifetime of tag pairing
 #define PAIR_LIFETIME	5000
 
-// Number of samples to average over
-#define RANGE_SAMPLES_AVG	8.0
-
 // Delay to start listening after discover
 #define DISCOVER_TX_TO_ANNOUNCE_RX_DELAY_UUS	400
 #define DISCOVER_RX_TO_ANNOUNCE_TX_DELAY_UUS	460
@@ -151,8 +165,9 @@ enum {
 #define FUNC_PAIR_RESP				0xE4
 #define FUNC_COORD_ANNO				0xE5
 #define FUNC_RANGE_REPO				0xE6
+#define FUNC_RANGE_BURST			0xE7
 
-#define CPH_MAX_MSG_SIZE		64
+#define CPH_MAX_MSG_SIZE		128
 
 #define PACKED	__attribute__((packed))
 
@@ -202,7 +217,6 @@ typedef struct PACKED {
 typedef struct PACKED {
 	uint16_t shortid;
 	double range;
-	double range_avg;
 } cph_deca_anchor_range_t;
 
 typedef struct PACKED {

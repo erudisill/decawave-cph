@@ -197,6 +197,13 @@ void anchor_run(void) {
 				cph_deca_load_frame(&tx_range_response_t.header, sizeof(tx_range_response_t));
 				cph_deca_send_delayed();
 
+//				uint32_t msb = (uint32_t)(poll_rx_ts >> 32);
+//				uint32_t lsb = (uint32_t)(poll_rx_ts & 0xFFFFFFFF);
+//				printf("timestamps: %08X%08X   ", msb, lsb);
+//				msb = (uint32_t)(resp_tx_ts >> 32);
+//				lsb = (uint32_t)(resp_tx_ts & 0xFFFFFFFF);
+//				printf("%08X%08X\r\n", msb, lsb);
+
 			} else if (rx_header->functionCode == FUNC_DISC_ANNO) {
 
 				if (can_respond_to_discover(rx_header->source)) {
@@ -244,7 +251,7 @@ void anchor_run(void) {
 				TRACE("\r\n");
 
 			} else {
-				TRACE("ERROR: unknown function code - data: ");
+				TRACE("ERROR: unknown function code - data %02X: ", rx_header->functionCode);
 				for (int i = 0; i < frame_len; i++)
 					TRACE("%02X ", rx_buffer[i]);
 				TRACE("\r\n");

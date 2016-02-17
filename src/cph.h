@@ -11,10 +11,13 @@
 #define FW_MAJOR				0x01
 #define FW_MINOR				0x01
 
-#define	ANCHOR
-//#define TAG
+//#define	ANCHOR
+#define TAG
 
 #define TRACE(...)				printf(__VA_ARGS__)
+
+
+//#define DEBUG_PRINT_RXFRAME
 
 
 #include <asf.h>

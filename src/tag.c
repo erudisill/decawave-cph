@@ -60,6 +60,19 @@ MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short
 		0x0000			// mac_cs
 		};
 
+static cph_deca_msg_range_response_t tx_range_response_msg = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		MAC_TAG_ID,		// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_RANGE_BURST,		// functionCode
+		0x00000000,		// pollRxTs
+		0x00000000,		// respTxTs
+		0x0000			// mac_cs
+		};
+
+typedef unsigned long long uint64;
 
 // Discovered anchors and their ranges
 static cph_deca_anchor_range_t anchors[ANCHORS_MIN];
@@ -74,6 +87,8 @@ static uint32 status_reg = 0;
 
 /* Hold copies of computed time of flight and distance here for reference, so reader can examine it at a breakpoint. */
 static double tof;
+
+static uint64 get_sys_timestamp_u64(void);
 
 static int range(cph_deca_anchor_range_t * range) {
 	int result = CPH_OK;
@@ -114,8 +129,6 @@ static int range(cph_deca_anchor_range_t * range) {
 				tof = ((rtd_init - rtd_resp) / 2.0) * DWT_TIME_UNITS;
 				range->range = tof * SPEED_OF_LIGHT;
 
-				range->range_avg -= (range->range_avg / RANGE_SAMPLES_AVG);
-				range->range_avg += (range->range / RANGE_SAMPLES_AVG);
 			} else {
 				result = CPH_BAD_FRAME;
 			}
@@ -239,7 +252,7 @@ void refresh_anchors(void) {
 static void send_ranges(int tries) {
 	printf("%d\t%04X\t", tries,cph_coordid);
 	for (int i = 0; i < ANCHORS_MIN; i++) {
-		printf("%04X: %3.2f m (%3.2f m)\t", anchors[i].shortid, anchors[i].range, anchors[i].range_avg);
+		printf("%04X: %3.2f m\t", anchors[i].shortid, anchors[i].range);
 	}
 	printf("\r\n");
 
@@ -251,6 +264,48 @@ static void send_ranges(int tries) {
 
 		cph_deca_load_frame((cph_deca_msg_header_t*)&tx_range_results_msg, sizeof(tx_range_results_msg));
 		cph_deca_send_immediate();
+	}
+}
+
+void tag_burst_run(void) {
+	// Setup DECAWAVE
+	cph_deca_init_device();
+	cph_deca_init_network(cph_config->panid, cph_config->shortid);
+
+	// Set basic poll message as coming from us, broadcast to all
+	tx_range_response_msg.header.source = cph_config->shortid;
+	tx_range_response_msg.header.dest = 0xFFFF;
+	tx_range_response_msg.header.functionCode = FUNC_RANGE_BURST;
+
+	// Poll loop
+	while (1) {
+
+		printf("burst\r\n");
+
+		uint8_t seq = 0;
+		uint64 poll_rx_ts = get_sys_timestamp_u64();
+		uint64 resp_tx_ts = poll_rx_ts;
+
+		seq = 0;
+
+		for (int i=0;i<5;i++) {
+			tx_range_response_msg.requestRxTs = resp_tx_ts;
+//			resp_tx_ts +=  (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME);
+			resp_tx_ts +=  (8000 * UUS_TO_DWT_TIME);
+			uint32_t resp_tx_time = resp_tx_ts >> 8;
+			dwt_setdelayedtrxtime(resp_tx_time);
+			tx_range_response_msg.responseTxTs = resp_tx_ts;
+
+			tx_range_response_msg.header.seq = seq++;
+			dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_TXFRS);
+			dwt_writetxdata(sizeof(tx_range_response_msg), (uint8_t*) &tx_range_response_msg, 0);
+			dwt_writetxfctrl(sizeof(tx_range_response_msg), 0);
+			cph_deca_send_delayed();
+		}
+
+		// Execute a delay between ranging exchanges.
+//		deca_sleep(POLL_DELAY_MS);
+		deca_sleep(1000);
 	}
 }
 
@@ -318,3 +373,26 @@ void tag_run(void) {
 	}
 }
 
+
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_sys_timestamp_u64()
+ *
+ * @brief Get the SYS time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_sys_timestamp_u64(void) {
+	uint8 ts_tab[5];
+	uint64 ts = 0;
+	int i;
+	dwt_readsystime(ts_tab);
+	for (i = 4; i >= 0; i--) {
+		ts <<= 8;
+		ts |= ts_tab[i];
+	}
+	return ts;
+}

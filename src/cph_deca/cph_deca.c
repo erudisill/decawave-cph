@@ -68,9 +68,18 @@ cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame
 	*frame_len = dwt_read32bitreg(RX_FINFO_ID) & RX_FINFO_RXFL_MASK_1023;
 	if (*frame_len <= CPH_MAX_MSG_SIZE) {
 		dwt_readrxdata(rx_buffer, *frame_len, 0);
+
+#if defined(DEBUG_PRINT_RXFRAME)
+		printf("FRM: ");
+		for (int i=0;i<*frame_len;i++)
+			printf("%02X ", rx_buffer[i]);
+		printf("\r\n");
+#endif
+
 		return (cph_deca_msg_header_t*)rx_buffer;
 	}
 	else {
+		TRACE("Bad length: %04X\r\n", *frame_len);
 		return 0;
 	}
 
