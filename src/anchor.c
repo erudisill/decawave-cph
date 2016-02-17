@@ -58,6 +58,8 @@ static uint32 status_reg = 0;
 /* Timestamps of frames transmission/reception.
  * As they are 40-bit wide, we need to define a 64-bit int type to handle them. */
 typedef unsigned long long uint64;
+typedef signed long long int64;
+
 static uint64 poll_rx_ts;
 static uint64 resp_tx_ts;
 
@@ -66,6 +68,7 @@ static cph_deca_pair_info_t paired_tags[MAX_TAGS];
 
 /* Declaration of static functions. */
 static uint64 get_rx_timestamp_u64(void);
+static uint64 get_tx_timestamp_u64(void);
 
 static bool can_respond_to_discover(uint16_t shortid) {
 	for (int i = 0; i < MAX_TAGS; i++) {
@@ -164,6 +167,9 @@ void anchor_run(void) {
 		}
 
 		/* Activate reception immediately. */
+#if defined(RANGE_METHOD_DS_TWR)
+        dwt_setrxtimeout(0);
+#endif
 		dwt_rxenable(0);
 
 		status_reg = cph_deca_wait_for_rx_finished();
@@ -175,7 +181,7 @@ void anchor_run(void) {
 			rx_header = cph_deca_read_frame(rx_buffer, &frame_len);
 
 			// Look for Poll message
-			if (rx_header->functionCode == FUNC_RANGE_REQU) {
+			if (rx_header->functionCode == FUNC_RANGE_POLL) {
 				uint32 resp_tx_time;
 
 				/* Retrieve poll reception timestamp. */
@@ -185,11 +191,18 @@ void anchor_run(void) {
 				resp_tx_time = (poll_rx_ts + (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
 				dwt_setdelayedtrxtime(resp_tx_time);
 
+#if defined(RANGE_METHOD_DS_TWR)
+                /* Set expected delay and timeout for final message reception. */
+                dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
+                dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+#endif
+
+
 				/* Response TX timestamp is the transmission time we programmed plus the antenna delay. */
 				resp_tx_ts = (((uint64) (resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
 
 				/* Write all timestamps in the final message. See NOTE 8 below. */
-				tx_range_response_t.requestRxTs = poll_rx_ts;
+				tx_range_response_t.pollRxTs = poll_rx_ts;
 				tx_range_response_t.responseTxTs = resp_tx_ts;
 
 				/* Send the response message */
@@ -197,12 +210,41 @@ void anchor_run(void) {
 				cph_deca_load_frame(&tx_range_response_t.header, sizeof(tx_range_response_t));
 				cph_deca_send_delayed();
 
-//				uint32_t msb = (uint32_t)(poll_rx_ts >> 32);
-//				uint32_t lsb = (uint32_t)(poll_rx_ts & 0xFFFFFFFF);
-//				printf("timestamps: %08X%08X   ", msb, lsb);
-//				msb = (uint32_t)(resp_tx_ts >> 32);
-//				lsb = (uint32_t)(resp_tx_ts & 0xFFFFFFFF);
-//				printf("%08X%08X\r\n", msb, lsb);
+//				TRACE("ts: %08X  %08X\r\n", (uint32_t)(poll_rx_ts >> 8), resp_tx_time);
+
+			} else if (rx_header->functionCode == FUNC_RANGE_FINA) {
+
+				uint64 final_rx_ts;
+                uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
+                uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
+                double Ra, Rb, Da, Db;
+                double distance, tof;
+                int64 tof_dtu;
+
+                /* Retrieve response transmission and final reception timestamps. */
+                resp_tx_ts = get_tx_timestamp_u64();	//ERIC: Should pull this from final message
+                final_rx_ts = get_rx_timestamp_u64();
+
+                /* Get timestamps embedded in the final message. */
+                poll_tx_ts = ((cph_deca_msg_range_final_t*)rx_header)->pollTxTs;
+                resp_rx_ts = ((cph_deca_msg_range_final_t*)rx_header)->responseRxTs;
+                final_tx_ts = ((cph_deca_msg_range_final_t*)rx_header)->finalTxTs;
+
+                /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 10 below. */
+                poll_rx_ts_32 = (uint32)poll_rx_ts;
+                resp_tx_ts_32 = (uint32)resp_tx_ts;
+                final_rx_ts_32 = (uint32)final_rx_ts;
+                Ra = (double)(resp_rx_ts - poll_tx_ts);
+                Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
+                Da = (double)(final_tx_ts - resp_rx_ts);
+                Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
+                tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+
+                tof = tof_dtu * DWT_TIME_UNITS;
+                distance = tof * SPEED_OF_LIGHT;
+
+                /* Display computed distance on LCD. */
+                TRACE("DIST: %3.2f m\r\n", distance);
 
 			} else if (rx_header->functionCode == FUNC_DISC_ANNO) {
 
@@ -289,4 +331,27 @@ static uint64 get_rx_timestamp_u64(void) {
 		ts |= ts_tab[i];
 	}
 	return ts;
+}
+
+
+/*! ------------------------------------------------------------------------------------------------------------------
+ * @fn get_tx_timestamp_u64()
+ *
+ * @brief Get the TX time-stamp in a 64-bit variable.
+ *        /!\ This function assumes that length of time-stamps is 40 bits, for both TX and RX!
+ *
+ * @param  none
+ *
+ * @return  64-bit value of the read time-stamp.
+ */
+static uint64 get_tx_timestamp_u64(void) {
+    uint8 ts_tab[5];
+    uint64 ts = 0;
+    int i;
+    dwt_readtxtimestamp(ts_tab);
+    for (i = 4; i >= 0; i--) {
+        ts <<= 8;
+        ts |= ts_tab[i];
+    }
+    return ts;
 }

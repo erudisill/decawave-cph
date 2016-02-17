@@ -40,6 +40,25 @@ void tag_burst_run(void);
 #endif
 
 
+
+#if defined(RANGE_METHOD_DS_TWR)
+
+#define DW_CONFIG		\
+{																															\
+    2,               			/* Channel number. */																		\
+    DWT_PRF_64M,     			/* Pulse repetition frequency. */															\
+    DWT_PLEN_1024,  		 	/* Preamble length. */																		\
+    DWT_PAC32,      		 	/* Preamble acquisition chunk size. Used in RX only. */										\
+    9,              		 	/* TX preamble code. Used in TX only. */													\
+    9,              		 	/* RX preamble code. Used in RX only. */													\
+    1,             		 	 	/* Use non-standard SFD (Boolean) */														\
+    DWT_BR_110K,    		 	/* Data rate. */																			\
+    DWT_PHRMODE_STD, 			/* PHY header mode. */																		\
+    (1025 + 64 - 32) 			/* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */			\
+}
+
+#else
+
 #define DW_CONFIG		\
 		{																													\
 		    2,               /* Channel number. */																			\
@@ -54,21 +73,9 @@ void tag_burst_run(void);
 		    (129 + 8 - 8)    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */				\
 		}
 
+#endif
 
-//// Mode 3 from EVK
-//#define DW_CONFIG		\
-//		{																													\
-//		    2,               /* Channel number. */																			\
-//			DWT_PRF_64M,     /* Pulse repetition frequency. */																\
-//			DWT_PLEN_1024,    /* Preamble length. */																			\
-//			DWT_PAC32,        /* Preamble acquisition chunk size. Used in RX only. */										\
-//		    9,               /* TX preamble code. Used in TX only. */														\
-//		    9,               /* RX preamble code. Used in RX only. */														\
-//		    1,               /* Use non-standard SFD (Boolean) */															\
-//			DWT_BR_110K,      /* Data rate. */																				\
-//		    DWT_PHRMODE_STD, /* PHY header mode. */																			\
-//			(1025 + 64 - 32)    /* SFD timeout (preamble length + 1 + SFD length - PAC size). Used in RX only. */				\
-//		}
+
 
 /* Inter-ranging delay period, in milliseconds. */
 #define RNG_DELAY_MS 	5
@@ -93,6 +100,30 @@ void tag_burst_run(void);
 #define UUS_TO_DWT_TIME 65536
 
 
+#if defined(RANGE_METHOD_DS_TWR)
+
+/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
+//#define POLL_TX_TO_RESP_RX_DLY_UUS 150
+#define POLL_TX_TO_RESP_RX_DLY_UUS 100
+/* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
+ * frame length of approximately 2.66 ms with above configuration. */
+//#define RESP_RX_TO_FINAL_TX_DLY_UUS		3100
+#define RESP_RX_TO_FINAL_TX_DLY_UUS		3500
+/* Receive response timeout. See NOTE 5 below. */
+#define RESP_RX_TIMEOUT_UUS 2700
+
+/* Delay between frames, in UWB microseconds. See NOTE 4 below. */
+/* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
+ * frame length of approximately 2.46 ms with above configuration. */
+//#define POLL_RX_TO_RESP_TX_DLY_UUS		2600
+#define POLL_RX_TO_RESP_TX_DLY_UUS		3000
+/* This is the delay from the end of the frame transmission to the enable of the receiver, as programmed for the DW1000's wait for response feature. */
+#define RESP_TX_TO_FINAL_RX_DLY_UUS		500
+/* Receive final timeout. See NOTE 5 below. */
+#define FINAL_RX_TIMEOUT_UUS			3300
+
+#else
+
 ///* Delay between frames, in UWB microseconds.  For TAG */
 //#define POLL_TX_TO_RESP_RX_DLY_UUS 330
 ///* Receive response timeout. See NOTE 5 below. */
@@ -103,11 +134,15 @@ void tag_burst_run(void);
 /* Receive response timeout. See NOTE 5 below. */
 #define RESP_RX_TIMEOUT_UUS 900
 
-
-
 /* Delay between frames, in UWB microseconds.  For ANCHOR */
 //#define POLL_RX_TO_RESP_TX_DLY_UUS 660
 #define POLL_RX_TO_RESP_TX_DLY_UUS 550
+
+/* This is the delay from Frame RX timestamp to TX reply timestamp used for calculating/setting the DW1000's delayed TX function. This includes the
+ * frame length of approximately 2.66 ms with above configuration. */
+#define RESP_RX_TO_FINAL_TX_DLY_UUS 3100
+
+#endif
 
 
 /* Speed of light in air, in metres per second. */
@@ -158,14 +193,19 @@ enum {
 	CPH_MODE_COORD = 0x80
 };
 
-#define	FUNC_RANGE_REQU				0xE0
-#define FUNC_RANGE_RESP				0xE1
-#define FUNC_DISC_ANNO				0xE2
-#define FUNC_DISC_REPLY				0xE3
-#define FUNC_PAIR_RESP				0xE4
-#define FUNC_COORD_ANNO				0xE5
-#define FUNC_RANGE_REPO				0xE6
-#define FUNC_RANGE_BURST			0xE7
+#define	FUNC_RANGE_POLL				0xA0
+#define FUNC_RANGE_RESP				0xA1
+#define FUNC_RANGE_FINA				0xA2
+#define FUNC_RANGE_RESU				0xA3
+#define FUNC_RANGE_REPO				0xA4
+
+#define FUNC_RANGE_BURST			0xAF
+
+#define FUNC_DISC_ANNO				0xB2
+#define FUNC_DISC_REPLY				0xB3
+#define FUNC_PAIR_RESP				0xB4
+
+#define FUNC_COORD_ANNO				0xC5
 
 #define CPH_MAX_MSG_SIZE		128
 
@@ -187,10 +227,19 @@ typedef struct PACKED {
 
 typedef struct PACKED {
 	cph_deca_msg_header_t header;
-	uint32_t requestRxTs;
+	uint32_t pollRxTs;
 	uint32_t responseTxTs;
 	uint16_t mac_cs;
 } cph_deca_msg_range_response_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint32_t pollTxTs;
+	uint32_t responseTxTs;
+	uint32_t responseRxTs;
+	uint32_t finalTxTs;
+	uint16_t mac_cs;
+} cph_deca_msg_range_final_t;
 
 typedef struct PACKED {
 	cph_deca_msg_header_t header;
@@ -218,6 +267,12 @@ typedef struct PACKED {
 	uint16_t shortid;
 	double range;
 } cph_deca_anchor_range_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	cph_deca_anchor_range_t range;
+	uint16_t mac_cs;
+} cph_deca_msg_range_result_t;
 
 typedef struct PACKED {
 	cph_deca_msg_header_t header;

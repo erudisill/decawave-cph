@@ -96,10 +96,10 @@ void cph_deca_init_device() {
 
 	dwt_configure(&config);
 
-	txconfig.PGdly = 0xC2;			// for channel 2
-	txconfig.power = 0x07274767;	// smart power, channel 2, 64MHz
-	dwt_setsmarttxpower(1);
-	dwt_configuretxrf(&txconfig);
+//	txconfig.PGdly = 0xC2;			// for channel 2
+//	txconfig.power = 0x07274767;	// smart power, channel 2, 64MHz
+//	dwt_setsmarttxpower(1);
+//	dwt_configuretxrf(&txconfig);
 
 	dwt_setrxantennadelay(RX_ANT_DLY);
 	dwt_settxantennadelay(TX_ANT_DLY);
