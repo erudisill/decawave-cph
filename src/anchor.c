@@ -14,9 +14,8 @@
 #include <deca_regs.h>
 #include <deca_sleep.h>
 
-
 static cph_deca_msg_range_response_t tx_range_response = {
-		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
 		MAC_TAG_ID,		// mac.dest
@@ -28,7 +27,7 @@ static cph_deca_msg_range_response_t tx_range_response = {
 		};
 
 static cph_deca_msg_discover_reply_t tx_discover_reply = {
-		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
 		MAC_TAG_ID,		// mac.dest
@@ -39,7 +38,7 @@ static cph_deca_msg_discover_reply_t tx_discover_reply = {
 		};
 
 static cph_deca_msg_coord_announce_t tx_coord_announce = {
-		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
 		0xFFFF,			// mac.dest
@@ -49,7 +48,7 @@ static cph_deca_msg_coord_announce_t tx_coord_announce = {
 		};
 
 static cph_deca_msg_range_result_t tx_range_result = {
-		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
 		MAC_TAG_ID,		// mac.dest
@@ -58,7 +57,6 @@ static cph_deca_msg_range_result_t tx_range_result = {
 		0,				// cph_deca_anchor_range_t
 		0x0000			// mac_cs
 		};
-
 
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
@@ -180,7 +178,7 @@ void anchor_run(void) {
 
 		/* Activate reception immediately. */
 #if defined(RANGE_METHOD_DS_TWR)
-        dwt_setrxtimeout(0);
+		dwt_setrxtimeout(0);
 #endif
 		dwt_rxenable(0);
 
@@ -204,11 +202,10 @@ void anchor_run(void) {
 				dwt_setdelayedtrxtime(resp_tx_time);
 
 #if defined(RANGE_METHOD_DS_TWR)
-                /* Set expected delay and timeout for final message reception. */
-                dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
-                dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
+				/* Set expected delay and timeout for final message reception. */
+				dwt_setrxaftertxdelay(RESP_TX_TO_FINAL_RX_DLY_UUS);
+				dwt_setrxtimeout(FINAL_RX_TIMEOUT_UUS);
 #endif
-
 
 				/* Response TX timestamp is the transmission time we programmed plus the antenna delay. */
 				resp_tx_ts = (((uint64) (resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
@@ -227,42 +224,44 @@ void anchor_run(void) {
 			} else if (rx_header->functionCode == FUNC_RANGE_FINA) {
 
 				uint64 final_rx_ts;
-                uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
-                uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
-                double Ra, Rb, Da, Db;
-                double distance, tof;
-                int64 tof_dtu;
+				uint32 poll_tx_ts, resp_rx_ts, final_tx_ts;
+				uint32 poll_rx_ts_32, resp_tx_ts_32, final_rx_ts_32;
+				double Ra, Rb, Da, Db;
+				double distance, tof;
+				int64 tof_dtu;
 
-                // Retrieve response transmission and final reception timestamps.
-                resp_tx_ts = get_tx_timestamp_u64();	//ERIC: Should pull this from final message
-                final_rx_ts = get_rx_timestamp_u64();
+				// Retrieve response transmission and final reception timestamps.
+				resp_tx_ts = get_tx_timestamp_u64();	//ERIC: Should pull this from final message
+				final_rx_ts = get_rx_timestamp_u64();
 
-                // Get timestamps embedded in the final message.
-                poll_tx_ts = ((cph_deca_msg_range_final_t*)rx_header)->pollTxTs;
-                resp_rx_ts = ((cph_deca_msg_range_final_t*)rx_header)->responseRxTs;
-                final_tx_ts = ((cph_deca_msg_range_final_t*)rx_header)->finalTxTs;
+				// Get timestamps embedded in the final message.
+				poll_tx_ts = ((cph_deca_msg_range_final_t*) rx_header)->pollTxTs;
+				resp_rx_ts = ((cph_deca_msg_range_final_t*) rx_header)->responseRxTs;
+				final_tx_ts = ((cph_deca_msg_range_final_t*) rx_header)->finalTxTs;
 
-                // Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped.
-                poll_rx_ts_32 = (uint32)poll_rx_ts;
-                resp_tx_ts_32 = (uint32)resp_tx_ts;
-                final_rx_ts_32 = (uint32)final_rx_ts;
-                Ra = (double)(resp_rx_ts - poll_tx_ts);
-                Rb = (double)(final_rx_ts_32 - resp_tx_ts_32);
-                Da = (double)(final_tx_ts - resp_rx_ts);
-                Db = (double)(resp_tx_ts_32 - poll_rx_ts_32);
-                tof_dtu = (int64)((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
+				// Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped.
+				poll_rx_ts_32 = (uint32) poll_rx_ts;
+				resp_tx_ts_32 = (uint32) resp_tx_ts;
+				final_rx_ts_32 = (uint32) final_rx_ts;
+				Ra = (double) (resp_rx_ts - poll_tx_ts);
+				Rb = (double) (final_rx_ts_32 - resp_tx_ts_32);
+				Da = (double) (final_tx_ts - resp_rx_ts);
+				Db = (double) (resp_tx_ts_32 - poll_rx_ts_32);
+				tof_dtu = (int64) ((Ra * Rb - Da * Db) / (Ra + Rb + Da + Db));
 
-                tof = tof_dtu * DWT_TIME_UNITS;
-                distance = tof * SPEED_OF_LIGHT;
+				tof = tof_dtu * DWT_TIME_UNITS;
+				distance = tof * SPEED_OF_LIGHT;
 
-                // Send result back to tag
-                tx_range_result.header.dest = rx_header->source;
-                tx_range_result.range.shortid = cph_config->shortid;
-                tx_range_result.range.range = distance;
+				// Send result back to tag
+				tx_range_result.header.dest = rx_header->source;
+				tx_range_result.range.shortid = cph_config->shortid;
+				tx_range_result.range.range = distance;
 				cph_deca_load_frame(&tx_range_result.header, sizeof(tx_range_result));
 				cph_deca_send_immediate();
 
-                TRACE("%04X DIST: %3.2f m\r\n", rx_header->source, distance);
+				if ((cph_mode & CPH_MODE_COORD) == 0) {
+					TRACE("%04X DIST: %3.2f m\r\n", rx_header->source, distance);
+				}
 
 			} else if (rx_header->functionCode == FUNC_DISC_ANNO) {
 
@@ -351,7 +350,6 @@ static uint64 get_rx_timestamp_u64(void) {
 	return ts;
 }
 
-
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn get_tx_timestamp_u64()
  *
@@ -363,13 +361,13 @@ static uint64 get_rx_timestamp_u64(void) {
  * @return  64-bit value of the read time-stamp.
  */
 static uint64 get_tx_timestamp_u64(void) {
-    uint8 ts_tab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
+	uint8 ts_tab[5];
+	uint64 ts = 0;
+	int i;
+	dwt_readtxtimestamp(ts_tab);
+	for (i = 4; i >= 0; i--) {
+		ts <<= 8;
+		ts |= ts_tab[i];
+	}
+	return ts;
 }

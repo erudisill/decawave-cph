@@ -414,6 +414,7 @@ void tag_burst_run(void) {
 }
 
 void tag_run(void) {
+	uint32_t start_ms, elapsed_ms, wait_ms;
 
 	// Setup DECAWAVE
 	cph_deca_init_device();
@@ -436,6 +437,8 @@ void tag_run(void) {
 
 		int ranges_countdown = MAX_RANGES_BEFORE_POLL_TIMEOUT;
 		anchors_status = ANCHORS_MASK;
+
+		start_ms = cph_get_millis();
 
 		while (anchors_status && (--ranges_countdown)) {
 
@@ -473,7 +476,11 @@ void tag_run(void) {
 		}
 
 		// Execute a delay between ranging exchanges.
-		deca_sleep(POLL_DELAY_MS);
+		elapsed_ms = cph_get_millis() - start_ms;
+		wait_ms = POLL_DELAY_MS - elapsed_ms;
+		if (wait_ms > POLL_DELAY_MS)
+			wait_ms = POLL_DELAY_MS;
+		deca_sleep(wait_ms);
 	}
 }
 
