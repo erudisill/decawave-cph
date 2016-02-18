@@ -17,6 +17,7 @@
 #define TRACE(...)				printf(__VA_ARGS__)
 
 #define RANGE_METHOD_DS_TWR
+#define COORD_NOT_ANCHOR
 
 //#define DEBUG_PRINT_RXFRAME
 

@@ -190,6 +190,15 @@ void anchor_run(void) {
 
 			rx_header = cph_deca_read_frame(rx_buffer, &frame_len);
 
+
+#if defined(COORD_NOT_ANCHOR)
+			// If we're the coordinator, only accept range reports
+			if (cph_mode & CPH_MODE_COORD) {
+				if (rx_header->functionCode != FUNC_RANGE_REPO)
+					continue;
+			}
+#endif
+
 			// Look for Poll message
 			if (rx_header->functionCode == FUNC_RANGE_POLL) {
 				uint32 resp_tx_time;
