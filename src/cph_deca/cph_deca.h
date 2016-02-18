@@ -307,6 +307,7 @@ void cph_deca_load_frame(cph_deca_msg_header_t * hdr, uint16_t size);
 cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame_len);
 uint32_t cph_deca_send_immediate();
 uint32_t cph_deca_send_delayed();
+uint32_t cph_deca_send_delayed_response_expected();
 uint32_t cph_deca_send_response_expected();
 void cph_deca_init_device();
 void cph_deca_init_network(uint16_t panid, uint16_t shortid);

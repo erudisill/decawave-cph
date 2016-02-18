@@ -47,7 +47,6 @@ MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short
 		0x0000			// mac_cs
 		};
 
-
 static cph_deca_msg_range_report_t tx_range_results_msg = {
 MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
@@ -61,7 +60,7 @@ MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short
 		};
 
 static cph_deca_msg_range_response_t tx_range_response_msg = {
-		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
 		MAC_TAG_ID,		// mac.dest
@@ -73,7 +72,7 @@ static cph_deca_msg_range_response_t tx_range_response_msg = {
 		};
 
 static cph_deca_msg_range_final_t tx_range_final_msg = {
-		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
 		MAC_TAG_ID,		// mac.dest
@@ -115,7 +114,7 @@ static int range(cph_deca_anchor_range_t * range) {
 	// Setup POLL frame to request to range with anchor
 	tx_poll_msg.header.dest = range->shortid;
 
-	cph_deca_load_frame((cph_deca_msg_header_t*)&tx_poll_msg, sizeof(tx_poll_msg));
+	cph_deca_load_frame((cph_deca_msg_header_t*) &tx_poll_msg, sizeof(tx_poll_msg));
 	status_reg = cph_deca_send_response_expected();
 
 	if (status_reg & SYS_STATUS_RXFCG) {
@@ -139,19 +138,41 @@ static int range(cph_deca_anchor_range_t * range) {
 				final_tx_time = (resp_rx_ts + (RESP_RX_TO_FINAL_TX_DLY_UUS * UUS_TO_DWT_TIME)) >> 8;
 				dwt_setdelayedtrxtime(final_tx_time);
 
-                // Final TX timestamp is the transmission time we programmed plus the TX antenna delay.
-                final_tx_ts = (((uint64)(final_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
+				// Final TX timestamp is the transmission time we programmed plus the TX antenna delay.
+				final_tx_ts = (((uint64) (final_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
 
-                // Write timestamps
-                tx_range_final_msg.pollTxTs = (uint32_t)(poll_tx_ts & 0x00000000ffffffff);
-                tx_range_final_msg.responseRxTs = (uint32_t)(resp_rx_ts & 0x00000000ffffffff);
-                tx_range_final_msg.responseTxTs = ((cph_deca_msg_range_response_t*)rx_header)->responseTxTs;
-                tx_range_final_msg.finalTxTs = (uint32_t)(final_tx_ts & 0x00000000ffffffff);
+				// Write timestamps
+				tx_range_final_msg.pollTxTs = (uint32_t) (poll_tx_ts & 0x00000000ffffffff);
+				tx_range_final_msg.responseRxTs = (uint32_t) (resp_rx_ts & 0x00000000ffffffff);
+				tx_range_final_msg.responseTxTs = ((cph_deca_msg_range_response_t*) rx_header)->responseTxTs;
+				tx_range_final_msg.finalTxTs = (uint32_t) (final_tx_ts & 0x00000000ffffffff);
 
-                // Send the final set of timestamps after calculated delay
-                tx_range_final_msg.header.dest = range->shortid;
-                cph_deca_load_frame((cph_deca_msg_header_t*)&tx_range_final_msg, sizeof(tx_range_final_msg));
-                cph_deca_send_delayed();
+				// Send the final set of timestamps after calculated delay...wait for results
+				tx_range_final_msg.header.dest = range->shortid;
+				cph_deca_load_frame((cph_deca_msg_header_t*) &tx_range_final_msg, sizeof(tx_range_final_msg));
+				//cph_deca_send_delayed();
+				status_reg = cph_deca_send_delayed_response_expected();
+
+				// RESULT RECEIVED
+				if (status_reg & SYS_STATUS_RXFCG) {
+					rx_header = cph_deca_read_frame(rx_buffer, &frame_len);
+					if (rx_header) {
+						if (rx_header->functionCode == FUNC_RANGE_RESU) {
+							// Got it!  Record the range.
+							range->range = ((cph_deca_msg_range_result_t*)rx_buffer)->range.range;
+						} else {
+							result = CPH_BAD_FRAME;
+						}
+					} else {
+						result = CPH_BAD_LENGTH;
+					}
+
+				} else {
+					// Clear RX error events in the DW1000 status register.
+					dwt_write32bitreg(SYS_STATUS_ID, SYS_STATUS_ALL_RX_ERR);
+					result = CPH_ERROR;
+				}
+
 
 			} else {
 				result = CPH_BAD_FRAME;
@@ -234,7 +255,7 @@ static int discover(int idx) {
 	dwt_setrxtimeout(RESP_RX_TIMEOUT_UUS * 2);
 
 	// Broadcast anchor discovery request
-	cph_deca_load_frame((cph_deca_msg_header_t*)&tx_discover_msg, sizeof(tx_discover_msg));
+	cph_deca_load_frame((cph_deca_msg_header_t*) &tx_discover_msg, sizeof(tx_discover_msg));
 	status_reg = cph_deca_send_response_expected();
 
 	if (status_reg & SYS_STATUS_RXFCG) {
@@ -251,21 +272,21 @@ static int discover(int idx) {
 
 				// Now send the pair response back
 				tx_pair_msg.header.dest = shortid;
-				cph_deca_load_frame((cph_deca_msg_header_t*)&tx_pair_msg, sizeof(tx_pair_msg));
+				cph_deca_load_frame((cph_deca_msg_header_t*) &tx_pair_msg, sizeof(tx_pair_msg));
 				cph_deca_send_immediate();
 
-                // Grab the coordinator id
-                if (((cph_deca_msg_discover_reply_t*) rx_buffer)->coordid != cph_coordid) {
-                	cph_coordid = ((cph_deca_msg_discover_reply_t*) rx_buffer)->coordid;
-                	printf("coordinator discovered at %04X\r\n", cph_coordid);
-                }
+				// Grab the coordinator id
+				if (((cph_deca_msg_discover_reply_t*) rx_buffer)->coordid != cph_coordid) {
+					cph_coordid = ((cph_deca_msg_discover_reply_t*) rx_buffer)->coordid;
+					printf("coordinator discovered at %04X\r\n", cph_coordid);
+				}
 
-                // Check for duplicate
-				for (int i=0;i<ANCHORS_MIN;i++) {
+				// Check for duplicate
+				for (int i = 0; i < ANCHORS_MIN; i++) {
 					if (anchors[i].shortid == shortid) {
-		                printf("shortid %04X already exists in anchors[%d]\r\n", shortid, i);
-		                result = CPH_DUPLICATE;
-		                break;
+						printf("shortid %04X already exists in anchors[%d]\r\n", shortid, i);
+						result = CPH_DUPLICATE;
+						break;
 					}
 				}
 
@@ -316,7 +337,7 @@ void refresh_anchors(void) {
 			anchor_refresh_ts = cph_get_millis();
 		}
 
-		for (int i=0;i<ANCHORS_MIN;i++) {
+		for (int i = 0; i < ANCHORS_MIN; i++) {
 			if (anchors_status & (1 << i)) {
 				int result = discover(i);
 				if (result == CPH_OK) {
@@ -333,7 +354,7 @@ void refresh_anchors(void) {
 }
 
 static void send_ranges(int tries) {
-	printf("%d\t%04X\t", tries,cph_coordid);
+	printf("%d\t%04X\t", tries, cph_coordid);
 	for (int i = 0; i < ANCHORS_MIN; i++) {
 		printf("%04X: %3.2f m\t", anchors[i].shortid, anchors[i].range);
 	}
@@ -345,7 +366,7 @@ static void send_ranges(int tries) {
 		tx_range_results_msg.numranges = ANCHORS_MIN;
 		memcpy(&tx_range_results_msg.ranges[0], &anchors[0], sizeof(cph_deca_anchor_range_t) * ANCHORS_MIN);
 
-		cph_deca_load_frame((cph_deca_msg_header_t*)&tx_range_results_msg, sizeof(tx_range_results_msg));
+		cph_deca_load_frame((cph_deca_msg_header_t*) &tx_range_results_msg, sizeof(tx_range_results_msg));
 		cph_deca_send_immediate();
 	}
 }
@@ -371,10 +392,10 @@ void tag_burst_run(void) {
 
 		seq = 0;
 
-		for (int i=0;i<5;i++) {
+		for (int i = 0; i < 5; i++) {
 			tx_range_response_msg.pollRxTs = resp_tx_ts;
 //			resp_tx_ts +=  (POLL_RX_TO_RESP_TX_DLY_UUS * UUS_TO_DWT_TIME);
-			resp_tx_ts +=  (8000 * UUS_TO_DWT_TIME);
+			resp_tx_ts += (8000 * UUS_TO_DWT_TIME);
 			uint32_t resp_tx_time = resp_tx_ts >> 8;
 			dwt_setdelayedtrxtime(resp_tx_time);
 			tx_range_response_msg.responseTxTs = resp_tx_ts;
@@ -447,8 +468,7 @@ void tag_run(void) {
 
 		if (ranges_countdown) {
 			send_ranges(MAX_RANGES_BEFORE_POLL_TIMEOUT - ranges_countdown);
-		}
-		else {
+		} else {
 			printf("ranges_countdown expired!\r\n");
 		}
 
@@ -456,8 +476,6 @@ void tag_run(void) {
 		deca_sleep(POLL_DELAY_MS);
 	}
 }
-
-
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn get_sys_timestamp_u64()
@@ -480,8 +498,6 @@ static uint64 get_sys_timestamp_u64(void) {
 	}
 	return ts;
 }
-
-
 
 /*! ------------------------------------------------------------------------------------------------------------------
  * @fn get_rx_timestamp_u64()
@@ -515,13 +531,13 @@ static uint64 get_rx_timestamp_u64(void) {
  * @return  64-bit value of the read time-stamp.
  */
 static uint64 get_tx_timestamp_u64(void) {
-    uint8 ts_tab[5];
-    uint64 ts = 0;
-    int i;
-    dwt_readtxtimestamp(ts_tab);
-    for (i = 4; i >= 0; i--) {
-        ts <<= 8;
-        ts |= ts_tab[i];
-    }
-    return ts;
+	uint8 ts_tab[5];
+	uint64 ts = 0;
+	int i;
+	dwt_readtxtimestamp(ts_tab);
+	for (i = 4; i >= 0; i--) {
+		ts <<= 8;
+		ts |= ts_tab[i];
+	}
+	return ts;
 }

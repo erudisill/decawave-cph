@@ -15,7 +15,7 @@
 #include <deca_sleep.h>
 
 
-static cph_deca_msg_range_response_t tx_range_response_t = {
+static cph_deca_msg_range_response_t tx_range_response = {
 		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
 		MAC_PAN_ID,		// mac.panid
@@ -47,6 +47,18 @@ static cph_deca_msg_coord_announce_t tx_coord_announce = {
 		FUNC_COORD_ANNO,	// functionCode
 		0x0000			// mac_cs
 		};
+
+static cph_deca_msg_range_result_t tx_range_result = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		MAC_TAG_ID,		// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_RANGE_RESU,	// functionCode
+		0,				// cph_deca_anchor_range_t
+		0x0000			// mac_cs
+		};
+
 
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
@@ -144,7 +156,7 @@ void anchor_run(void) {
 	memset(paired_tags, 0, sizeof(cph_deca_pair_info_t) * MAX_TAGS);
 
 	// Set our shortid in common messages
-	tx_range_response_t.header.source = cph_config->shortid;
+	tx_range_response.header.source = cph_config->shortid;
 	tx_discover_reply.header.source = cph_config->shortid;
 	tx_coord_announce.header.source = cph_config->shortid;
 
@@ -202,12 +214,12 @@ void anchor_run(void) {
 				resp_tx_ts = (((uint64) (resp_tx_time & 0xFFFFFFFE)) << 8) + TX_ANT_DLY;
 
 				/* Write all timestamps in the final message. See NOTE 8 below. */
-				tx_range_response_t.pollRxTs = poll_rx_ts;
-				tx_range_response_t.responseTxTs = resp_tx_ts;
+				tx_range_response.pollRxTs = poll_rx_ts;
+				tx_range_response.responseTxTs = resp_tx_ts;
 
 				/* Send the response message */
-				tx_range_response_t.header.dest = rx_header->source;
-				cph_deca_load_frame(&tx_range_response_t.header, sizeof(tx_range_response_t));
+				tx_range_response.header.dest = rx_header->source;
+				cph_deca_load_frame(&tx_range_response.header, sizeof(tx_range_response));
 				cph_deca_send_delayed();
 
 //				TRACE("ts: %08X  %08X\r\n", (uint32_t)(poll_rx_ts >> 8), resp_tx_time);
@@ -221,16 +233,16 @@ void anchor_run(void) {
                 double distance, tof;
                 int64 tof_dtu;
 
-                /* Retrieve response transmission and final reception timestamps. */
+                // Retrieve response transmission and final reception timestamps.
                 resp_tx_ts = get_tx_timestamp_u64();	//ERIC: Should pull this from final message
                 final_rx_ts = get_rx_timestamp_u64();
 
-                /* Get timestamps embedded in the final message. */
+                // Get timestamps embedded in the final message.
                 poll_tx_ts = ((cph_deca_msg_range_final_t*)rx_header)->pollTxTs;
                 resp_rx_ts = ((cph_deca_msg_range_final_t*)rx_header)->responseRxTs;
                 final_tx_ts = ((cph_deca_msg_range_final_t*)rx_header)->finalTxTs;
 
-                /* Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped. See NOTE 10 below. */
+                // Compute time of flight. 32-bit subtractions give correct answers even if clock has wrapped.
                 poll_rx_ts_32 = (uint32)poll_rx_ts;
                 resp_tx_ts_32 = (uint32)resp_tx_ts;
                 final_rx_ts_32 = (uint32)final_rx_ts;
@@ -243,8 +255,14 @@ void anchor_run(void) {
                 tof = tof_dtu * DWT_TIME_UNITS;
                 distance = tof * SPEED_OF_LIGHT;
 
-                /* Display computed distance on LCD. */
-                TRACE("DIST: %3.2f m\r\n", distance);
+                // Send result back to tag
+                tx_range_result.header.dest = rx_header->source;
+                tx_range_result.range.shortid = cph_config->shortid;
+                tx_range_result.range.range = distance;
+				cph_deca_load_frame(&tx_range_result.header, sizeof(tx_range_result));
+				cph_deca_send_immediate();
+
+                TRACE("%04X DIST: %3.2f m\r\n", rx_header->source, distance);
 
 			} else if (rx_header->functionCode == FUNC_DISC_ANNO) {
 
