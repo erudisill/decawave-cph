@@ -11,7 +11,7 @@
 static struct usart_module usart_instance;
 
 
-void cph_stdio_init(void) {
+struct usart_module * cph_stdio_init(void) {
 
 	struct usart_config config_usart;
 	usart_get_config_defaults(&config_usart);
@@ -25,6 +25,12 @@ void cph_stdio_init(void) {
 
 	stdio_serial_init(&usart_instance, STDIO_HW, &config_usart);
 	usart_enable(&usart_instance);
+
+	return &usart_instance;
 }
 
 
+void cph_stdio_set_rx_callback(usart_callback_t callback_func) {
+	usart_register_callback(&usart_instance, callback_func, USART_CALLBACK_BUFFER_RECEIVED);
+	usart_enable_callback(&usart_instance, USART_CALLBACK_BUFFER_RECEIVED);
+}

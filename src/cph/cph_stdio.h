@@ -10,7 +10,8 @@
 
 #include <cph.h>
 
-void cph_stdio_init(void);
+struct usart_module * cph_stdio_init(void);
+void cph_stdio_set_rx_callback(usart_callback_t callback_func);
 
 
 #endif /* SRC_CPH_CPH_STDIO_H_ */

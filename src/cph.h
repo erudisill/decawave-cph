@@ -11,8 +11,8 @@
 #define FW_MAJOR				0x01
 #define FW_MINOR				0x01
 
-//#define	ANCHOR
-#define TAG
+#define	ANCHOR
+//#define TAG
 
 #define TRACE(...)				printf(__VA_ARGS__)
 
@@ -49,5 +49,6 @@ extern int cph_mode;
 
 extern uint16_t cph_coordid;
 
+extern volatile uint32_t cph_signal;
 
 #endif /* SRC_CPH_H_ */

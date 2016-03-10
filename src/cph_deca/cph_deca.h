@@ -304,6 +304,16 @@ inline uint32_t cph_deca_wait_for_rx_finished(void) {
 	return status_reg;
 }
 
+//inline uint32_t cph_deca_wait_for_rx_finished_or_signal(volatile uint32_t * signal) {
+//	uint32_t status_reg;
+//	while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
+//		if (*signal != 0) {
+//			port_pin_toggle_output_level(LED_PIN);
+//			break;
+//		}
+//	};
+//	return status_reg;
+//}
 
 void cph_deca_load_frame(cph_deca_msg_header_t * hdr, uint16_t size);
 cph_deca_msg_header_t * cph_deca_read_frame(uint8_t * rx_buffer, uint32_t *frame_len);

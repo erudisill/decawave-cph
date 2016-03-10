@@ -40,6 +40,11 @@ int cph_mode = CPH_MODE_TAG;
 
 uint16_t cph_coordid = 0;
 
+volatile uint32_t cph_signal = 0x00;
+
+struct usart_module * usart_instance;
+uint16_t rx_char = 0x00;
+
 static void init_config(void) {
 	bool do_reset = false;
 
@@ -77,11 +82,23 @@ static void init_config(void) {
 			cph_config->shortid);
 }
 
+void usart_callback_rx(struct usart_module * usart) {
+//	port_pin_toggle_output_level(LED_PIN);
+	cph_signal = rx_char;
+	usart_read_job(usart_instance, &rx_char);
+}
+
 int main(void) {
 	system_init();
 
 	cph_millis_init();
-	cph_stdio_init();
+	usart_instance = cph_stdio_init();
+	cph_stdio_set_rx_callback(usart_callback_rx);
+
+	// start listening
+	usart_read_job(usart_instance, &rx_char);
+
+	system_interrupt_enable_global();
 
 	TRACE(APP_NAME, FW_MAJOR, FW_MINOR);
 
@@ -92,10 +109,9 @@ int main(void) {
 	for (int i = 0; i < (5 * 4); i++) {
 		if (cph_mode & CPH_MODE_ANCHOR)
 		{
-			char c = SERCOM0->USART.DATA.reg;
-			if (c == 'c') {
+			if (rx_char == 'c') {
 				cph_mode |= CPH_MODE_COORD;
-				printf("IS COORDINATOR\r\n", c);
+				printf("IS COORDINATOR\r\n");
 				break;
 			}
 		}
@@ -118,8 +134,6 @@ int main(void) {
     // Start with board specific hardware init.
 	cph_deca_init_gpio();
 	cph_deca_spi_init();
-
-	system_interrupt_enable_global();
 
 	app_run();
 }

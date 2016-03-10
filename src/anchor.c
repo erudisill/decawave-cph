@@ -10,6 +10,7 @@
 
 #include <cph.h>
 #include <cph_deca.h>
+#include <cph_deca_range.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <deca_sleep.h>
@@ -142,6 +143,39 @@ static void announce_coord(int repeat) {
 	}
 }
 
+static double range_with_anchor(uint16_t reps, uint16_t periodms) {
+	int status = CPH_OK;
+	double accum;
+	int count;
+
+	cph_deca_anchor_range_t anchor;
+
+	anchor.shortid = 0x6518;
+
+	TRACE("RANGING with %04X\r\n", anchor.shortid);
+
+	// Go back to idle
+	dwt_forcetrxoff();
+
+	accum = 0;
+	count = 0;
+
+	for (int i=0;i<reps;i++) {
+		anchor.range = 0;
+		if ((status = cph_deca_range(&anchor, rx_buffer)) == CPH_OK) {
+			TRACE("%02d Range: %3.2fm\r\n", count, anchor.range);
+			accum += anchor.range;
+			count++;
+		}
+		else {
+			TRACE("RANGE ERROR!  %02X\r\n", status);
+		}
+		cph_millis_delay(periodms);
+	}
+
+	return accum / count;
+}
+
 void anchor_run(void) {
 	uint32_t announce_coord_ts = 0;
 	uint32_t elapsed = 0;
@@ -182,7 +216,21 @@ void anchor_run(void) {
 #endif
 		dwt_rxenable(0);
 
-		status_reg = cph_deca_wait_for_rx_finished();
+		cph_signal = 0x00;
+		//status_reg = cph_deca_wait_for_rx_finished_or_signal(&cph_signal);
+		while (!((status_reg = dwt_read32bitreg(SYS_STATUS_ID)) & (SYS_STATUS_RXFCG | SYS_STATUS_ALL_RX_ERR))) {
+			if (cph_signal != 0) {
+				break;
+			}
+		};
+
+		if (cph_signal) {
+			if (cph_signal == 'r') {
+				double avg_range = range_with_anchor(50, 10);
+				TRACE("AVERAGE RANGE ====> %3.2fm\r\n", avg_range);
+				continue;
+			}
+		}
 
 		if (status_reg & SYS_STATUS_RXFCG) {
 			uint32 frame_len;

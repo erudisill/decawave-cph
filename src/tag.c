@@ -18,16 +18,6 @@
 #define ANCHOR_ID		0x616A
 
 /* Frames used in the ranging process.  */
-static cph_deca_msg_range_request_t tx_poll_msg = {
-MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac.seq
-		MAC_PAN_ID,		// mac.panid
-		MAC_ANCHOR_ID,	// mac.dest  	'A' 'W'
-		MAC_TAG_ID,		// mac.source	'E' 'V'
-		FUNC_RANGE_POLL,		// functionCode
-		0x0000			// mac_cs
-		};
-
 static cph_deca_msg_discover_announce_t tx_discover_msg = {
 MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
 		0,				// mac.seq
@@ -69,19 +59,6 @@ MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short
 		FUNC_RANGE_BURST,		// functionCode
 		0x00000000,		// pollRxTs
 		0x00000000,		// respTxTs
-		0x0000			// mac_cs
-		};
-
-static cph_deca_msg_range_final_t tx_range_final_msg = {
-MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
-		0,				// mac.seq
-		MAC_PAN_ID,		// mac.panid
-		MAC_TAG_ID,		// mac.dest
-		MAC_ANCHOR_ID,	// mac.source
-		FUNC_RANGE_FINA,		// functionCode
-		0x00000000,		// pollRxTs
-		0x00000000,		// respTxTs
-		0x00000000,		// finalTxTs
 		0x0000			// mac_cs
 		};
 
@@ -274,8 +251,6 @@ void tag_run(void) {
 	cph_deca_init_network(cph_config->panid, cph_config->shortid);
 
 	// Set our short id in common messages
-	tx_poll_msg.header.source = cph_config->shortid;
-	tx_range_final_msg.header.source = cph_config->shortid;
 	tx_discover_msg.header.source = cph_config->shortid;
 	tx_pair_msg.header.source = cph_config->shortid;
 	tx_range_results_msg.header.source = cph_config->shortid;
