@@ -28,7 +28,7 @@
  * Support and FAQ: visit <a href="http://www.atmel.com/design-support/">Atmel Support</a>
  */
 #include <cph.h>
-#include <cph_deca_port.h>
+#include <cph_deca.h>
 
 cph_config_t * cph_config;
 

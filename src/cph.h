@@ -11,8 +11,8 @@
 #define FW_MAJOR				0x01
 #define FW_MINOR				0x01
 
-#define	ANCHOR
-//#define TAG
+//#define	ANCHOR
+#define TAG
 
 #define TRACE(...)				printf(__VA_ARGS__)
 
@@ -29,7 +29,8 @@
 #include <cph_queue.h>
 #include <cph_config.h>
 #include <cph_utils.h>
-#include <cph_deca.h>
+//#include <cph_deca.h>
+//#include <cph_deca_range.h>
 
 typedef struct PACKED {
 	uint8_t magic[4];

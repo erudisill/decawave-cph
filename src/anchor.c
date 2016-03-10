@@ -9,7 +9,7 @@
 #include <string.h>
 
 #include <cph.h>
-#include <cph_deca_port.h>
+#include <cph_deca.h>
 #include <deca_device_api.h>
 #include <deca_regs.h>
 #include <deca_sleep.h>
