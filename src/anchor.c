@@ -59,6 +59,32 @@ MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short
 		0x0000			// mac_cs
 		};
 
+static cph_deca_msg_survey_request_t tx_survey_request = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		0xFFFF,			// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_SURV_REQU,	// functionCode
+		0,				// target_short_id
+		0,				// reps
+		0,				// periodms
+		0x0000			// mac_cs
+};
+
+static cph_deca_msg_survey_response_t tx_survey_response = {
+		MAC_FC,			// mac.ctl - data frame, frame pending, pan id comp, short dest, short source
+		0,				// mac.seq
+		MAC_PAN_ID,		// mac.panid
+		MAC_TAG_ID,		// mac.dest
+		MAC_ANCHOR_ID,	// mac.source
+		FUNC_SURV_RESP,	// functionCode
+		0,				// cph_deca_anchor_range_t
+		0,				// error count
+		0x0000			// mac_cs
+		};
+
+
 /* Buffer to store received messages.
  * Its size is adjusted to longest frame that this example code is supposed to handle. */
 static uint8 rx_buffer[CPH_MAX_MSG_SIZE];
@@ -143,14 +169,14 @@ static void announce_coord(int repeat) {
 	}
 }
 
-static double range_with_anchor(uint16_t reps, uint16_t periodms) {
+static double range_with_anchor(uint16_t shortid, uint16_t reps, uint16_t periodms, int * err_count) {
 	int status = CPH_OK;
 	double accum;
 	int count;
 
 	cph_deca_anchor_range_t anchor;
 
-	anchor.shortid = 0x6518;
+	anchor.shortid = shortid;
 
 	TRACE("RANGING with %04X\r\n", anchor.shortid);
 
@@ -159,6 +185,7 @@ static double range_with_anchor(uint16_t reps, uint16_t periodms) {
 
 	accum = 0;
 	count = 0;
+	*err_count = 0;
 
 	for (int i=0;i<reps;i++) {
 		anchor.range = 0;
@@ -169,11 +196,41 @@ static double range_with_anchor(uint16_t reps, uint16_t periodms) {
 		}
 		else {
 			TRACE("RANGE ERROR!  %02X\r\n", status);
+			(*err_count)++;
 		}
 		cph_millis_delay(periodms);
 	}
 
 	return accum / count;
+}
+
+static bool handle_signal(void) {
+	bool result = true;
+	int shortid_a, shortid_b;
+	int x, y;
+
+	TRACE("Command: %s\r\n", cph_rx_buff);
+
+	if (cph_rx_buff[0] == 'r') {
+		if (sscanf(&cph_rx_buff[2], "%x %x %d %d", &shortid_a, &shortid_b, &x, &y) != 4) {
+			TRACE("BAD FORMAT\r\n");
+		} else {
+			// send message
+			dwt_forcetrxoff();
+			tx_survey_request.header.dest = shortid_a;
+			tx_survey_request.target_short_id = shortid_b;
+			tx_survey_request.reps = x;
+			tx_survey_request.periodms = y;
+			cph_deca_load_frame(&tx_survey_request.header, sizeof(tx_survey_request));
+			cph_deca_send_immediate();
+		}
+	}
+	else {
+		result = false;
+	}
+
+	cph_clear_rx_buff();
+	return result;
 }
 
 void anchor_run(void) {
@@ -191,6 +248,8 @@ void anchor_run(void) {
 	tx_range_response.header.source = cph_config->shortid;
 	tx_discover_reply.header.source = cph_config->shortid;
 	tx_coord_announce.header.source = cph_config->shortid;
+	tx_survey_request.header.source = cph_config->shortid;
+	tx_survey_response.header.source = cph_config->shortid;
 
 	// Announce ourselves if we're the coordinator
 	if (cph_mode & CPH_MODE_COORD) {
@@ -225,11 +284,8 @@ void anchor_run(void) {
 		};
 
 		if (cph_signal) {
-			if (cph_signal == 'r') {
-				double avg_range = range_with_anchor(50, 10);
-				TRACE("AVERAGE RANGE ====> %3.2fm\r\n", avg_range);
+			if (handle_signal())
 				continue;
-			}
 		}
 
 		if (status_reg & SYS_STATUS_RXFCG) {
@@ -240,9 +296,10 @@ void anchor_run(void) {
 
 
 #if defined(COORD_NOT_ANCHOR)
-			// If we're the coordinator, only accept range reports
+			// If we're the coordinator, only accept range reports and commands
 			if (cph_mode & CPH_MODE_COORD) {
-				if (rx_header->functionCode != FUNC_RANGE_REPO)
+				TRACE("functionCode: %02\r\n", rx_header->functionCode);
+				if (rx_header->functionCode != FUNC_RANGE_REPO && rx_header->functionCode != FUNC_SURV_REQU && rx_header->functionCode != FUNC_SURV_RESP)
 					continue;
 			}
 #endif
@@ -365,6 +422,28 @@ void anchor_run(void) {
 					TRACE(" %04X:%3.2f", results->ranges[i].shortid, results->ranges[i].range);
 				}
 				TRACE("\r\n");
+
+			} else if (rx_header->functionCode == FUNC_SURV_REQU) {
+				cph_deca_msg_survey_request_t * req = ((cph_deca_msg_survey_request_t*) rx_buffer);
+				uint16_t sourceid = req->header.source;
+				uint16_t targetid = req->target_short_id;
+				int err_count = 0;
+
+				TRACE("Survey req from %04X: %04X %d %d\r\n", req->header.source, req->target_short_id, req->reps, req->periodms);
+				double dist = range_with_anchor(req->target_short_id, req->reps, req->periodms, &err_count);
+				TRACE("AVERAGE RANGE ====> %3.2fm\r\n", dist);
+
+				tx_survey_response.header.dest = sourceid;
+				tx_survey_response.range.shortid = targetid;
+				tx_survey_response.range.range = dist;
+				tx_survey_response.error_count = err_count;
+				cph_deca_load_frame(&tx_survey_response.header, sizeof(tx_survey_response));
+				cph_deca_send_immediate();
+
+
+			} else if (rx_header->functionCode == FUNC_SURV_RESP) {
+				cph_deca_msg_survey_response_t * resp = ((cph_deca_msg_survey_response_t*) rx_buffer);
+				TRACE("S %04X %04X %3.2f %d\r\n", resp->header.source,  resp->range.shortid, resp->range.range, resp->error_count);
 
 			} else {
 				TRACE("ERROR: unknown function code - data %02X: ", rx_header->functionCode);

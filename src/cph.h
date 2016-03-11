@@ -51,4 +51,10 @@ extern uint16_t cph_coordid;
 
 extern volatile uint32_t cph_signal;
 
+#define CPH_RX_BUFF_LEN		80
+extern uint8_t cph_rx_buff[CPH_RX_BUFF_LEN];
+
+void cph_clear_rx_buff(void);
+
+
 #endif /* SRC_CPH_H_ */

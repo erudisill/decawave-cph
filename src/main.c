@@ -43,7 +43,9 @@ uint16_t cph_coordid = 0;
 volatile uint32_t cph_signal = 0x00;
 
 struct usart_module * usart_instance;
-uint16_t rx_char = 0x00;
+static uint16_t rx_char = 0x00;
+static uint8_t rx_buff_ndx = 0;
+uint8_t cph_rx_buff[CPH_RX_BUFF_LEN];
 
 static void init_config(void) {
 	bool do_reset = false;
@@ -84,8 +86,18 @@ static void init_config(void) {
 
 void usart_callback_rx(struct usart_module * usart) {
 //	port_pin_toggle_output_level(LED_PIN);
-	cph_signal = rx_char;
+	if (rx_char == '\r') {
+		cph_signal = 0xff;
+	} else if (rx_buff_ndx < (CPH_RX_BUFF_LEN - 1)) {
+		cph_rx_buff[rx_buff_ndx++] = rx_char;
+	}
 	usart_read_job(usart_instance, &rx_char);
+}
+
+void cph_clear_rx_buff(void) {
+	memset(cph_rx_buff, 0, CPH_RX_BUFF_LEN);
+	rx_buff_ndx = 0;
+	cph_signal = 0x00;
 }
 
 int main(void) {
@@ -96,6 +108,7 @@ int main(void) {
 	cph_stdio_set_rx_callback(usart_callback_rx);
 
 	// start listening
+	cph_clear_rx_buff();
 	usart_read_job(usart_instance, &rx_char);
 
 	system_interrupt_enable_global();

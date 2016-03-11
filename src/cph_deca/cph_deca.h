@@ -209,6 +209,9 @@ enum {
 
 #define FUNC_COORD_ANNO				0xC5
 
+#define FUNC_SURV_REQU				0x01
+#define FUNC_SURV_RESP				0x21
+
 #define CPH_MAX_MSG_SIZE		128
 
 #define PACKED	__attribute__((packed))
@@ -282,6 +285,21 @@ typedef struct PACKED {
 	cph_deca_anchor_range_t ranges[ANCHORS_MIN];		//TODO: Make this dynamic
 	uint16_t mac_fs;
 } cph_deca_msg_range_report_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	uint16_t target_short_id;
+	uint16_t reps;
+	uint16_t periodms;
+	uint16_t mac_cs;
+} cph_deca_msg_survey_request_t;
+
+typedef struct PACKED {
+	cph_deca_msg_header_t header;
+	cph_deca_anchor_range_t range;
+	uint16_t error_count;
+	uint16_t mac_cs;
+} cph_deca_msg_survey_response_t;
 
 typedef struct PACKED {
 	uint16_t shortid;
