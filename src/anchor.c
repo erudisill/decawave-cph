@@ -298,8 +298,8 @@ void anchor_run(void) {
 #if defined(COORD_NOT_ANCHOR)
 			// If we're the coordinator, only accept range reports and commands
 			if (cph_mode & CPH_MODE_COORD) {
-				TRACE("functionCode: %02\r\n", rx_header->functionCode);
-				if (rx_header->functionCode != FUNC_RANGE_REPO && rx_header->functionCode != FUNC_SURV_REQU && rx_header->functionCode != FUNC_SURV_RESP)
+//				TRACE("functionCode: %02\r\n", rx_header->functionCode);
+				if (rx_header->functionCode != FUNC_RANGE_REPO && rx_header->functionCode != FUNC_SURV_REQU && rx_header->functionCode != FUNC_SURV_RESP && rx_header->functionCode != FUNC_COORD_ANNO)
 					continue;
 			}
 #endif
@@ -414,6 +414,10 @@ void anchor_run(void) {
 						cph_mode &= (~CPH_MODE_COORD);
 					}
 				}
+				// If I'm the coordinator, spit out the announcement - this acts as the anchor report
+				if (cph_mode & CPH_MODE_COORD) {
+					TRACE("* A %04X %04X\r\n", rx_header->source, id);
+				}
 
 			} else if (rx_header->functionCode == FUNC_RANGE_REPO) {
 				cph_deca_msg_range_report_t * results = ((cph_deca_msg_range_report_t*) rx_buffer);
@@ -443,7 +447,7 @@ void anchor_run(void) {
 
 			} else if (rx_header->functionCode == FUNC_SURV_RESP) {
 				cph_deca_msg_survey_response_t * resp = ((cph_deca_msg_survey_response_t*) rx_buffer);
-				TRACE("S %04X %04X %3.2f %d\r\n", resp->header.source,  resp->range.shortid, resp->range.range, resp->error_count);
+				TRACE("* S %04X %04X %3.2f %d\r\n", resp->header.source,  resp->range.shortid, resp->range.range, resp->error_count);
 
 			} else {
 				TRACE("ERROR: unknown function code - data %02X: ", rx_header->functionCode);
