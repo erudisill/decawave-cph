@@ -150,14 +150,14 @@ void tag_burst_run(void);
 
 
 // Min Number of anchors to range with - if this changes, so should ANCHORS_MASK
-//#define ANCHORS_MIN		4
+#define ANCHORS_MIN		4
 //#define ANCHORS_MIN		3
-#define ANCHORS_MIN		1
+//#define ANCHORS_MIN		1
 
 // Used for tracking status of anchor ids (by bitmask) during discovery and poll
-//#define ANCHORS_MASK	0x0F
+#define ANCHORS_MASK	0x0F
 //#define ANCHORS_MASK	0x07
-#define ANCHORS_MASK	0x01
+//#define ANCHORS_MASK	0x01
 
 // Anchor refresh interval
 #define ANCHORS_REFRESH_INTERVAL	10000
